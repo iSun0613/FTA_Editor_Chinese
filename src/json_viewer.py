@@ -11,7 +11,22 @@ from pathlib import Path
 import re
 import tempfile
 import os
+import sys
 from datetime import datetime
+
+def cjk_font():
+    """选择当前系统可用的中文字体，避免 Noto Sans CJK 缺失导致中文变成方框"""
+    if sys.platform == "win32":
+        return "Microsoft YaHei"   # 微软雅黑，Windows 自带
+    if sys.platform == "darwin":
+        return "PingFang SC"       # macOS 苹方
+    return "WenQuanYi Micro Hei"   # Linux 文泉驿微米黑
+
+# 逻辑门类型的界面显示映射
+GATE_LABEL = {
+    "AND": "与门", "OR": "或门", "NOT": "非门",
+    "XOR": "异或门", "VOTER": "表决门", "VOT": "表决门",
+}
 
 def sanitize_id(s):
     return re.sub(r'[^0-9A-Za-z_]', '_', str(s))
@@ -21,12 +36,12 @@ def node_label(node):
     p = node.get("probability")
     cp = node.get("calculatedProbability")
     gate = node.get("logicGate", "")
-    
-    p_str = f"{p:.1E}" if p is not None else "N/A"
-    cp_str = f"{cp:.1E}" if cp is not None else "N/A"
-    
-    # Show gate type with probabilities, all on same line
-    gate_str = f"Gate: {gate} | " if gate else ""
+
+    p_str = f"{p:.1E}" if p is not None else "未计算"
+    cp_str = f"{cp:.1E}" if cp is not None else "未计算"
+
+    # 显示门类型与概率，同一行展示
+    gate_str = f"门: {GATE_LABEL.get(str(gate), gate)} | " if gate else ""
     
     # Color coding based on calculated probability
     if cp == 1.0:
@@ -40,7 +55,7 @@ def node_label(node):
     
     return f'''<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="{bgcolor}">
         <TR><TD HEIGHT="24">{name}</TD></TR>
-        <TR><TD HEIGHT="18"><FONT POINT-SIZE="9">{gate_str}P:{p_str} | P_calc:{cp_str}</FONT></TD></TR>
+        <TR><TD HEIGHT="18"><FONT POINT-SIZE="9">{gate_str}概率:{p_str} | 计算概率:{cp_str}</FONT></TD></TR>
     </TABLE>>'''
 
 def gather_nodes(root, hide_zero=False):
@@ -111,10 +126,10 @@ def gather_nodes(root, hide_zero=False):
 def build_dot(nodes, edges):
     lines = [
         'digraph G {',
-        '  rankdir=LR;',
+        '  rankdir=TB;',
         '  graph [nodesep=0.12, ranksep=0.5, margin=0.05, overlap=false];',  # Remove splines=true to allow per-edge override
-        '  node [shape=none, fontname="Noto Sans CJK JP"];',
-        '  edge [fontname="Noto Sans CJK JP", arrowsize=0.6];'
+        '  node [shape=none, fontname="' + cjk_font() + '"];',
+        '  edge [fontname="' + cjk_font() + '", arrowsize=0.6];'
     ]
 
     # Build parent-child relationships (only for structural edges, not links)
@@ -205,18 +220,34 @@ def build_dot(nodes, edges):
             # Link edges with polyline splines for sharp right-angle turns
             lines.append(f'  {src_id} -> {tgt_id} [style=dashed, constraint=false, splines=polyline, penwidth=1.5, color="blue"];')
         else:
-            # Tree edges: use straight lines with splines=line for direct connections
-            lines.append(f'  {src_id}:e -> {tgt_id}:w [style=solid, splines=line, penwidth=1.5, color="black"];')
+            # Tree edges: use straight vertical lines for direct connections
+            lines.append(f'  {src_id}:s -> {tgt_id}:n [style=solid, splines=line, penwidth=1.5, color="black"];')
 
     lines.append('}')
     return "\n".join(lines)
 
+def find_dot():
+    """定位 Graphviz 的 dot 可执行文件：先查 PATH，再找常见安装位置（应对 PATH 未配好）"""
+    cmd = shutil.which("dot")
+    if cmd and os.path.exists(cmd):
+        return cmd
+    candidates = [
+        r"C:\Program Files\Graphviz\bin\dot.exe",
+        r"C:\Program Files (x86)\Graphviz\bin\dot.exe",
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Graphviz", "bin", "dot.exe"),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return None
+
 def render_with_dot(dot_text, out_path: Path, high_quality=False):
     """Render DOT text to PNG image using Graphviz"""
-    dot_cmd = shutil.which("dot")
+    dot_cmd = find_dot()
     if not dot_cmd:
         raise FileNotFoundError(
-            "Graphviz 'dot' not found. Install from https://graphviz.org/download/ and add to PATH."
+            "Graphviz 'dot' not found. 请安装 graphviz 或在其安装目录含 bin/dot.exe。"
+            "下载: https://graphviz.org/download/"
         )
     
     tmp = None
@@ -301,9 +332,9 @@ def main():
     # Add title and date to DOT
     dot_lines = dot_text.split('\n')
     dot_lines.insert(1, f'  labelloc="t";')
-    dot_lines.insert(2, f'  label="{title}\\nDate: {date}";')
+    dot_lines.insert(2, f'  label="{title}\\n日期: {date}";')
     dot_lines.insert(3, f'  fontsize=14;')
-    dot_lines.insert(4, f'  fontname="Noto Sans CJK JP";')
+    dot_lines.insert(4, f'  fontname="{cjk_font()}";')
     dot_text = '\n'.join(dot_lines)
 
     dot_path = Path(args.dot)
@@ -321,6 +352,7 @@ def main():
     except Exception as e:
         print(f"Rendering failed: {e}")
         print(f"To render manually: dot -Tpng -o {args.output} {dot_path}")
+        sys.exit(1)  # 渲染失败时返回非零退出码，避免上层把空图误判为成功
 
 if __name__ == "__main__":
     main()

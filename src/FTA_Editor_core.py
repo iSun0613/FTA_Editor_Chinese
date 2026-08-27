@@ -31,7 +31,7 @@ class FTACore:
         """Initialize FTA core with default root node"""
         self.fta_data = {
             "id": "root",
-            "name": "RootEvent",
+            "name": "根事件",
             "type": "Root",
             "logicGate": "",
             "probability": 1.0,  # Changed from 0.0 to 1.0 for better initial display
@@ -42,7 +42,7 @@ class FTACore:
         self.last_saved_file = None
         
         # Metadata fields with default date
-        self.title = "Untitled Analysis"
+        self.title = "未命名分析"
         self.date = datetime.now().strftime("%Y-%m-%d")
         self.mode = "FTA"  # "FTA" or "ETA"
     

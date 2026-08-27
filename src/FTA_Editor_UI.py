@@ -1165,7 +1165,10 @@ class FTAEditorUI:
                 cmd.append("--hide-zero")
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             
-            if proc.returncode == 0 and tmp_png.exists():
+            # 仅当渲染器确实产出了有效 PNG 才去打开，避免空文件导致“cannot identify image file”
+            png_ok = (proc.returncode == 0 and tmp_png.exists()
+                      and tmp_png.stat().st_size > 0)
+            if png_ok:
                 try:
                     from PIL import Image, ImageTk
                     pil_img = Image.open(str(tmp_png))
@@ -1188,13 +1191,15 @@ class FTAEditorUI:
                     self._clear_preview_error()
                 except Exception as e:
                     self._show_preview_error(f"图像加载失败: {e}")
-            else:
+            elif proc.stderr:
                 error_msg = f"渲染器失败（退出码 {proc.returncode}）"
-                if proc.stderr:
-                    error_msg += f"\n标准错误: {proc.stderr.strip()}"
+                error_msg += f"\n标准错误: {proc.stderr.strip()}"
                 if proc.stdout:
                     error_msg += f"\n标准输出: {proc.stdout.strip()}"
                 self._show_preview_error(error_msg)
+            else:
+                # 空树等场景渲染器不产出有效图片，给中性提示而非报错
+                self._show_preview_error("暂无内容可预览，请在画布中添加节点后刷新")
         except Exception as e:
             import traceback
             self._show_preview_error(f"预览更新失败: {e}\n回溯信息: {traceback.format_exc()}")
@@ -1761,6 +1766,12 @@ class FTAEditorUI:
                 raise RuntimeError(
                     f"渲染器失败（退出码 {proc.returncode}）。\n{proc.stdout}\n{proc.stderr}"
                 )
+            # 渲染成功但未产出有效 PNG（如当前树为空）时给出明确提示，而非报“cannot identify image file”
+            if tmp_png.stat().st_size == 0:
+                detail = (proc.stderr or "").strip()
+                raise RuntimeError(
+                    "当前树无可渲染内容，请先在画布中添加节点。\n" + detail
+                )
             
             # Also update live preview with high-quality image
             cmd_preview = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_preview_png)]
@@ -1794,6 +1805,9 @@ class FTAEditorUI:
     def _update_preview_with_image(self, image_path):
         """Update the live preview with a specific image file"""
         try:
+            if not image_path.exists() or image_path.stat().st_size == 0:
+                self._show_preview_error("暂无内容可预览（渲染未产出图片）")
+                return
             from PIL import Image, ImageTk
             pil_img = Image.open(str(image_path))
             self.preview_original_img = pil_img.copy()
