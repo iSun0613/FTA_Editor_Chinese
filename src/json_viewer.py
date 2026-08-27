@@ -31,18 +31,23 @@ GATE_LABEL = {
 def sanitize_id(s):
     return re.sub(r'[^0-9A-Za-z_]', '_', str(s))
 
-def node_label(node):
+def node_label(node, show_probability=True, show_inline_gate=True):
     name = node.get("name", node.get("id", ""))
-    p = node.get("probability")
-    cp = node.get("calculatedProbability")
     gate = node.get("logicGate", "")
+    cp = node.get("calculatedProbability")
 
-    p_str = f"{p:.1E}" if p is not None else "未计算"
-    cp_str = f"{cp:.1E}" if cp is not None else "未计算"
+    # 逻辑门 / 概率的副标题行（可按选项隐藏）
+    parts = []
+    if show_inline_gate and gate:
+        parts.append("门: " + GATE_LABEL.get(str(gate), gate))
+    if show_probability:
+        p = node.get("probability")
+        p_str = f"{p:.1E}" if p is not None else "未计算"
+        cp_str = f"{cp:.1E}" if cp is not None else "未计算"
+        parts.append(f"概率:{p_str}")
+        parts.append(f"计算概率:{cp_str}")
+    meta = " | ".join(parts)
 
-    # 显示门类型与概率，同一行展示
-    gate_str = f"门: {GATE_LABEL.get(str(gate), gate)} | " if gate else ""
-    
     # Color coding based on calculated probability
     if cp == 1.0:
         bgcolor = "pink"
@@ -52,10 +57,11 @@ def node_label(node):
         bgcolor = "lightyellow"
     else:
         bgcolor = "white"
-    
+
+    meta_row = f'<TR><TD HEIGHT="18"><FONT POINT-SIZE="9">{meta}</FONT></TD></TR>' if meta else ""
     return f'''<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" BGCOLOR="{bgcolor}">
         <TR><TD HEIGHT="24">{name}</TD></TR>
-        <TR><TD HEIGHT="18"><FONT POINT-SIZE="9">{gate_str}概率:{p_str} | 计算概率:{cp_str}</FONT></TD></TR>
+        {meta_row}
     </TABLE>>'''
 
 def gather_nodes(root, hide_zero=False):
@@ -123,7 +129,8 @@ def gather_nodes(root, hide_zero=False):
     
     return nodes, edges
 
-def build_dot(nodes, edges):
+def build_dot(nodes, edges, show_probability=True, gate_shape=False,
+              show_inline_gate=True):
     lines = [
         'digraph G {',
         '  rankdir=TB;',
@@ -143,7 +150,6 @@ def build_dot(nodes, edges):
             children_map.setdefault(parent, []).append(child)
             parent_map[child] = parent
             tree_edges.add((e[0], e[1]))  # Mark as tree edge
-
     # Calculate node depth based on tree structure only
     depths = {}
     def calc_depth(node_id):
@@ -158,7 +164,6 @@ def build_dot(nodes, edges):
     for nid in nodes:
         calc_depth(nid)
 
-    # Use tree structure traversal to determine node order, ignoring links
     nodes_by_depth = {}
     traversal_order = []
     
@@ -166,27 +171,51 @@ def build_dot(nodes, edges):
         nid = node.get("id")
         if nid not in nodes:
             return
-            
         traversal_order.append(nid)
         depth = depths.get(nid, 0)
         if depth not in nodes_by_depth:
             nodes_by_depth[depth] = []
         nodes_by_depth[depth].append(nid)
-        
-        # Process children in order - this preserves tree structure
         for child in node.get("children", []):
             assign_traversal_order(child)
     
-    # Find root node and traverse tree structure only
     root_nodes = [nid for nid in nodes.keys() if nid not in parent_map]
     for root_nid in root_nodes:
         if root_nid in nodes:
             assign_traversal_order(nodes[root_nid])
 
+    # 计算要绘制的结构边：若开启“事件之间显示门符号”，则在每个带逻辑门的节点与其子事件之间插入一个门图形
+    render_struct = []
+    gate_defs = []
+    gate_counter = [0]
+    for nid in traversal_order:
+        node = nodes[nid]
+        gate = node.get("logicGate", "")
+        children = [c for c in (node.get("children") or []) if c.get("id") in nodes]
+        if gate_shape and gate and children:
+            gate_counter[0] += 1
+            gid = "g%d" % gate_counter[0]
+            gname = GATE_LABEL.get(str(gate), gate) if isinstance(gate, str) else gate
+            gate_defs.append((gid, gname))
+            render_struct.append((nid, gid))
+            for c in children:
+                render_struct.append((gid, c.get("id")))
+        else:
+            for c in children:
+                render_struct.append((nid, c.get("id")))
+
     # Create nodes in traversal order
     for nid in traversal_order:
         if nid in nodes:
-            lines.append(f'  {sanitize_id(nid)} [label={node_label(nodes[nid])}];')
+            n = nodes[nid]
+            by_gate = gate_shape and n.get("logicGate") and [c for c in (n.get("children") or []) if c.get("id") in nodes]
+            label = node_label(n, show_probability=show_probability,
+                               show_inline_gate=not by_gate)
+            lines.append(f'  {sanitize_id(nid)} [label={label}];')
+
+    # 门符号图形（菱形）
+    for gid, gname in gate_defs:
+        lines.append(f'  {gid} [label="{gname}", shape=diamond, fontname="{cjk_font()}", style=filled, fillcolor="#e8e8e8"];')
 
     # Align nodes at same depth using invisible edges to preserve order
     for depth in sorted(nodes_by_depth.keys()):
@@ -194,34 +223,26 @@ def build_dot(nodes, edges):
         if len(depth_nodes) > 1:
             lines.append(f'  subgraph depth_{depth} {{')
             lines.append('    rank=same;')
-            # Create invisible edges in traversal order to maintain positioning
             for i in range(len(depth_nodes) - 1):
                 lines.append(f'    {sanitize_id(depth_nodes[i])} -> {sanitize_id(depth_nodes[i+1])} [style=invis];')
             lines.append('  }')
 
-    # Create edges with different styles for tree vs link connections
-    link_counter = {}  # Track multiple links to same target for offset
-    
+    # 结构边（事件-门-事件，或事件-事件）
+    for s, t in render_struct:
+        lines.append(f'  {sanitize_id(s)}:s -> {sanitize_id(t)}:n [style=solid, splines=line, penwidth=1.5, color="black"];')
+
+    # 关联虚线边
+    link_counter = {}
     for e in edges:
-        src_id = sanitize_id(e[0])
-        tgt_id = sanitize_id(e[1])
-        
-        # Check if this is a tree edge or link edge by checking the original edge structure
-        is_link_edge = len(e) > 3 and e[3] is True  # Link edges have 4th element as True
-        
-        if is_link_edge:
-            # Link edges: use polyline splines with sharp angles
+        if len(e) > 3 and e[3] is True:
+            src_id = sanitize_id(e[0])
+            tgt_id = sanitize_id(e[1])
             edge_key = (src_id, tgt_id)
             if edge_key not in link_counter:
                 link_counter[edge_key] = 0
             else:
                 link_counter[edge_key] += 1
-            
-            # Link edges with polyline splines for sharp right-angle turns
             lines.append(f'  {src_id} -> {tgt_id} [style=dashed, constraint=false, splines=polyline, penwidth=1.5, color="blue"];')
-        else:
-            # Tree edges: use straight vertical lines for direct connections
-            lines.append(f'  {src_id}:s -> {tgt_id}:n [style=solid, splines=line, penwidth=1.5, color="black"];')
 
     lines.append('}')
     return "\n".join(lines)
@@ -285,6 +306,9 @@ def main():
     ap.add_argument("--title", default="", help="diagram title (if not in JSON)")
     ap.add_argument("--hide-zero", action="store_true", help="hide nodes with zero calculated probability")
     ap.add_argument("--high-quality", action="store_true", help="render with high DPI for better quality (slower)")
+    ap.add_argument("--no-probability", action="store_true", help="do not render 概率/计算概率 text on nodes")
+    ap.add_argument("--no-inline-gate", action="store_true", help="do not render 门: text inside nodes (use --gate-shape for separate symbols)")
+    ap.add_argument("--gate-shape", action="store_true", help="draw a separate gate symbol between every event level")
     args = ap.parse_args()
 
     in_path = Path(args.input)
@@ -293,7 +317,7 @@ def main():
         return
 
     try:
-        raw_data = json.loads(in_path.read_text(encoding="utf-8"))
+        raw_data = json.loads(in_path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as e:
         print(f"JSON parsing error: {e}")
         return
@@ -327,7 +351,10 @@ def main():
         print("No nodes found in tree data")
         return
         
-    dot_text = build_dot(nodes, edges)
+    dot_text = build_dot(nodes, edges,
+                         show_probability=not args.no_probability,
+                         gate_shape=args.gate_shape,
+                         show_inline_gate=not args.no_inline_gate)
 
     # Add title and date to DOT
     dot_lines = dot_text.split('\n')

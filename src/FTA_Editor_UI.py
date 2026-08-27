@@ -135,6 +135,41 @@ class FTAEditorUI:
         hide_zero_cb = tk.Checkbutton(top_frame, text="隐藏零概率节点", variable=self.hide_zero_var, 
                                       bg="#f0f0f0", command=self._on_hide_zero_changed)
         hide_zero_cb.pack(side=tk.LEFT, padx=(10, 10))
+
+        # 渲染选项：概率文字 / 事件之间门符号（区别于原作者默认习惯，可按需开关并持久化）
+        self.show_probability_var = tk.BooleanVar(value=False)
+        prob_cb = tk.Checkbutton(top_frame, text="显示概率文字", variable=self.show_probability_var,
+                                 bg="#f0f0f0", command=self._save_render_options)
+        prob_cb.pack(side=tk.LEFT, padx=(2, 10))
+
+        self.gate_shape_var = tk.BooleanVar(value=True)
+        gate_cb = tk.Checkbutton(top_frame, text="事件间显示门符号", variable=self.gate_shape_var,
+                                 bg="#f0f0f0", command=self._save_render_options)
+        gate_cb.pack(side=tk.LEFT, padx=(2, 10))
+
+        self._render_options_file = Path.home() / ".fta_editor_render.json"
+        self._load_render_options()
+
+    def _load_render_options(self):
+        """从本地配置文件读取渲染选项（区分用户习惯与原作默认）"""
+        try:
+            if self._render_options_file.exists():
+                data = json.loads(self._render_options_file.read_text(encoding="utf-8"))
+                self.show_probability_var.set(bool(data.get("show_probability", False)))
+                self.gate_shape_var.set(bool(data.get("gate_shape", True)))
+        except Exception:
+            pass
+
+    def _save_render_options(self, event=None):
+        """保存渲染选项到本地配置文件"""
+        try:
+            data = {
+                "show_probability": bool(self.show_probability_var.get()),
+                "gate_shape": bool(self.gate_shape_var.get()),
+            }
+            self._render_options_file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
     
     def _on_mode_changed(self, event=None):
         """Handle mode change"""
@@ -1163,8 +1198,12 @@ class FTAEditorUI:
             tmp_png_f.close()
             
             cmd = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_png)]
+            if self.gate_shape_var.get():
+                cmd.append("--gate-shape")
             if self.hide_zero_var.get():
                 cmd.append("--hide-zero")
+            if not self.show_probability_var.get():
+                cmd.append("--no-probability")
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             
             # 仅当渲染器确实产出了有效 PNG 才去打开，避免空文件导致“cannot identify image file”
@@ -1797,10 +1836,20 @@ class FTAEditorUI:
             tmp_preview_png = Path(tmp_preview_png_f.name)
             tmp_preview_png_f.close()
             
+            # 渲染选项：是否显示概率文字 / 事件之间门符号
+            def _render_flags():
+                flags = []
+                if self.hide_zero_var.get():
+                    flags.append("--hide-zero")
+                if self.gate_shape_var.get():
+                    flags.append("--gate-shape")
+                if not self.show_probability_var.get():
+                    flags.append("--no-probability")
+                return flags
+
             # Render high-quality image for display window
             cmd = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_png)]
-            if self.hide_zero_var.get():
-                cmd.append("--hide-zero")
+            cmd.extend(_render_flags())
             cmd.append("--high-quality")
             proc = subprocess.run(cmd, capture_output=True, text=True)
             
@@ -1817,8 +1866,7 @@ class FTAEditorUI:
             
             # Also update live preview with high-quality image
             cmd_preview = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_preview_png)]
-            if self.hide_zero_var.get():
-                cmd_preview.append("--hide-zero")
+            cmd_preview.extend(_render_flags())
             cmd_preview.append("--high-quality")
             proc_preview = subprocess.run(cmd_preview, capture_output=True, text=True)
             
