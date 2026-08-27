@@ -368,7 +368,7 @@ class MoonshotProvider(OpenAICompatibleProvider):
     """月之暗面 Kimi（OpenAI 兼容接口）。Kimi K3/K2.x 新模型族的 temperature 为固定值，不支持传参。"""
     provider_display_name = "Kimi 月之暗面"
     default_endpoint = "https://api.moonshot.cn/v1"
-    default_models = ["kimi-k3", "kimi-k2.6"]
+    default_models = ["kimi-k3", "kimi-k2.7-code"]
     support_temperature = False
 
 

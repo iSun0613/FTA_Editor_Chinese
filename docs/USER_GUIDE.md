@@ -150,7 +150,7 @@ AI 助手通过兼容 OpenAI 的 API，为你的故障树提供智能分析与�
 | DeepSeek | `deepseek-v4-flash` / `deepseek-v4-pro` | https://platform.deepseek.com |
 | 通义千问（阿里云） | `qwen3.8-max` / `qwen3.8-flash` / `qwen3.7-plus` | https://dashscope.console.aliyun.com |
 | 智谱清言 | `glm-5.3` / `glm-5.3-flash` / `glm-4.7-flash` | https://open.bigmodel.cn |
-| Kimi（月之暗面） | `kimi-k3` / `kimi-k2.6` | https://platform.moonshot.cn |
+| Kimi（月之暗面） | `kimi-k3` / `kimi-k2.7-code` | https://platform.moonshot.cn |
 | Ollama 本地 | `qwen3:8b` / `llama3.3:70b` / `qwen2.5` | 免密钥，需本机 `ollama pull`，如 `ollama pull qwen3:8b` |
 
 说明：
@@ -386,7 +386,7 @@ OR 门：
 答：请核验你的 API 密钥是否有效且有可用额度，并检查网络连接。国内用户建议优先选择国内服务商（DeepSeek / 通义千问 / 智谱清言 / Kimi 或本地 Ollama），避免境外服务商对国内访问受限的问题。
 
 **问：AI 响应很慢。**
-答：可考虑改用速度更快的模型，如 `deepseek-v4-flash`、`qwen3.8-flash`、`glm-5.3-flash` 或 `kimi-k2.6`；也可检查所用服务商的 API 速率限制（rate limits）。
+答：可考虑改用速度更快的模型，如 `deepseek-v4-flash`、`qwen3.8-flash`、`glm-5.3-flash` 或 `kimi-k2.7-code`；也可检查所用服务商的 API 速率限制（rate limits）。
 
 **问：AI 的建议无法正确应用。**
 答：请确认你已在确认对话框中查看并勾选了需要应用的更改。

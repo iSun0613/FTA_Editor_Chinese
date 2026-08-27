@@ -87,10 +87,12 @@ python src/FTA_Editor_UI.py
 | **DeepSeek** | `deepseek-v4-flash` / `deepseek-v4-pro` | https://platform.deepseek.com |
 | **通义千问** | `qwen3.8-max` / `qwen3.8-flash` / `qwen3.7-plus` | https://dashscope.console.aliyun.com |
 | **智谱清言** | `glm-5.3` / `glm-5.3-flash` / `glm-4.7-flash` | https://open.bigmodel.cn |
-| **Kimi** | `kimi-k3` / `kimi-k2.6` | https://platform.moonshot.cn |
+| **Kimi** | `kimi-k3` / `kimi-k2.7-code` | https://platform.moonshot.cn |
 | **Ollama 本地** | `qwen3:8b` / `llama3.3:70b` / `qwen2.5` | 本机 `ollama pull`，免密钥 |
 
 国际服务商（OpenAI / Claude / Gemini）同样可在设置中选用。
+
+> **注意**：AI 设置窗口中，模型列表跟随最上方"AI 服务商"下拉框联动。默认停在 OpenAI，**请先切换到 DeepSeek / 通义千问 / 智谱清言 / Kimi / Ollama 本地**，下方的模型下拉框即会自动填入上表对应的默认模型；若已填写该服务商 API 密钥，则实时拉取该账号可用的全部模型。
 
 **配置**：打开 FTA Editor → AI 设置（⚙）→ 选择服务商、填入 API 密钥（本地模型可留空）→ 测试并保存。凭据仅保存在本地 `~/.fta_editor/ai_credentials.json`。
 

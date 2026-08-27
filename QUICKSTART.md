@@ -50,7 +50,7 @@ AI 助手可以分析你的故障树并提出改进建议。优先推荐国内�
 1. **DeepSeek（推荐）**：前往 https://platform.deepseek.com 注册并获取 API 密钥，模型可选 `deepseek-v4-flash` / `deepseek-v4-pro`。
 2. **通义千问（阿里云）**：前往 https://dashscope.console.aliyun.com 开通，模型可选 `qwen3.8-max` / `qwen3.8-flash` / `qwen3.7-plus`。
 3. **智谱清言**：前往 https://open.bigmodel.cn 开通，模型可选 `glm-5.3` / `glm-5.3-flash` / `glm-4.7-flash`。
-4. **Kimi（月之暗面）**：前往 https://platform.moonshot.cn 开通，模型可选 `kimi-k3` / `kimi-k2.6`（temperature 由程序自动适应，无需额外配置）。
+4. **Kimi（月之暗面）**：前往 https://platform.moonshot.cn 开通，模型可选 `kimi-k3` / `kimi-k2.7-code`（temperature 由程序自动适应，无需额外配置）。
 5. **Ollama 本地（免密钥）**：需在电脑上执行 `ollama pull qwen3:8b`（或其他模型，如 `llama3.3:70b`、`qwen2.5`）拉取模型后即可离线使用。
 6. （备选）国际服务商：OpenAI、Anthropic Claude、Google Gemini。
 

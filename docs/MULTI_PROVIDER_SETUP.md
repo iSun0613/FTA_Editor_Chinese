@@ -77,7 +77,7 @@ FTA Editor 现支持**国内外多家 AI 服务商**：国内/本地服务商（
 
 ### 4. Kimi（Moonshot，月之暗面）
 
-**推荐模型：** `kimi-k3` / `kimi-k2.6`
+**推荐模型：** `kimi-k3` / `kimi-k2.7-code`
 
 **开通地址：** https://platform.moonshot.cn
 
@@ -89,7 +89,7 @@ FTA Editor 现支持**国内外多家 AI 服务商**：国内/本地服务商（
    - **服务商**：选择 "Kimi"
    - **API 密钥**：粘贴你的密钥
    - **端点（Endpoint）**：程序已内置，一般无需改动
-   - **模型（Model）**：选择 `kimi-k3`（最新）或 `kimi-k2.6`
+   - **模型（Model）**：选择 `kimi-k3`（最新）或 `kimi-k2.7-code`
 4. 点击 **测试并保存**
 
 > 提示：Kimi 新模型的 temperature 由程序自动适应，无需手动调整。
@@ -242,7 +242,7 @@ FTA Editor 现支持**国内外多家 AI 服务商**：国内/本地服务商（
 | **DeepSeek** | 国内 | 按官方政策 | `deepseek-v4-flash` / `deepseek-v4-pro` | 性价比高 |
 | **通义千问** | 国内 | 按官方政策 | `qwen3.8-max` / `qwen3.8-flash` | 中文能力强 |
 | **智谱清言** | 国内 | 按官方政策 | `glm-5.3` / `glm-5.3-flash` | 均衡通用 |
-| **Kimi** | 国内 | 按官方政策 | `kimi-k3` / `kimi-k2.6` | 长文本 / 推理强 |
+| **Kimi** | 国内 | 按官方政策 | `kimi-k3` / `kimi-k2.7-code` | 长文本 / 推理强 |
 | **Ollama 本地** | 本地 | 免费（免密钥） | `qwen3:8b` / `llama3.3:70b` | 离线 / 隐私 |
 | Google Gemini | 国际 | ✅ 免费额度 | 下拉选择 | 有免费额度 |
 | Anthropic Claude | 国际 | ❌ | 下拉选择 | 境外支付 |

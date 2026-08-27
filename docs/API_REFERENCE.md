@@ -501,7 +501,7 @@ if handler.is_configured():
 | **DeepSeek（深度求索）** | `deepseek-v4-flash` / `deepseek-v4-pro` | https://platform.deepseek.com |
 | **通义千问（阿里云）** | `qwen3.8-max` / `qwen3.8-flash` / `qwen3.7-plus` | https://dashscope.console.aliyun.com |
 | **智谱清言（智谱 AI）** | `glm-5.3` / `glm-5.3-flash` / `glm-4.7-flash` | https://open.bigmodel.cn |
-| **Kimi（月之暗面）** | `kimi-k3` / `kimi-k2.6` | https://platform.moonshot.cn |
+| **Kimi（月之暗面）** | `kimi-k3` / `kimi-k2.7-code` | https://platform.moonshot.cn |
 | **Ollama（本地部署）** | `qwen3:8b` / `llama3.3:70b` / `qwen2.5` | 无需密钥，需先执行 `ollama pull` | 
 
 **说明**：国内用户优先使用国内服务商；OpenAI 等国际服务需自行前往官网申请密钥（作为备选方案）。Kimi 新版模型的 temperature 参数由程序自动适配，无需手动设置。

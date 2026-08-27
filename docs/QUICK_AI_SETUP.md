@@ -62,7 +62,7 @@
 3. 复制你的 API 密钥
 4. 打开 FTA Editor → AI 设置（⚙）
 5. 选择 "Kimi"
-6. 粘贴 API 密钥 → 模型自动填充（kimi-k3 / kimi-k2.6）
+6. 粘贴 API 密钥 → 模型自动填充（kimi-k3 / kimi-k2.7-code）
 7. 点击 "测试并保存"
 ```
 💡 **提示**：Kimi 新模型的 temperature 由程序自动适应，用户无需额外配置。

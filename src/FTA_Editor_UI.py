@@ -345,6 +345,11 @@ class FTAEditorUI:
         provider_combo = ttk.Combobox(dialog, values=provider_names, width=57, state="readonly")
         provider_combo.pack(padx=20, pady=2)
         provider_combo.set(existing_creds.get("provider", "OpenAI") if existing_creds else "OpenAI")
+        provider_hint = tk.Label(
+            dialog,
+            text="选择服务商后，下方模型列表会自动更新。国内/本地服务商：DeepSeek / 通义千问 / 智谱清言 / Kimi / Ollama 本地",
+            font=(UI_FONT, 8), fg="#888888", justify="left")
+        provider_hint.pack(anchor="w", padx=20)
         
         # API Key
         tk.Label(dialog, text="API 密钥:").pack(anchor="w", padx=20, pady=(10, 0))
