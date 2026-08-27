@@ -983,6 +983,8 @@ class FTAEditorUI:
             ("(S)另存JSON", "#b0e0e6", self.save_json_as),
             ("导出XML", "#dda0dd", self.export_to_xml),
             ("导出Excel", "#f0e68c", self.export_to_excel),
+            ("导出Mermaid", "#8dd9a0", self.export_to_mermaid),
+            ("复制Mermaid", "#7fd4c1", self.copy_mermaid),
             ("(R)渲染图形", "#87CEEB", self.render_img)
         ]
         
@@ -1730,6 +1732,46 @@ class FTAEditorUI:
             messagebox.showinfo("导出完成", f"已导出 Excel 到 {file_path}")
         else:
             messagebox.showerror("导出错误", error)
+
+    def _mermaid_text(self):
+        import mermaid_exporter
+        return mermaid_exporter.export_to_mermaid(self.core.prepare_export_data())
+
+    def export_to_mermaid(self):
+        """Export FTA data as Mermaid flowchart text (.mmd/.md)"""
+        try:
+            text = self._mermaid_text()
+        except Exception as exc:
+            messagebox.showerror("导出错误", f"生成 Mermaid 失败:\n{exc}")
+            return
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".mmd",
+            filetypes=[("Mermaid 文本", "*.mmd"), ("Markdown", "*.md"), ("文本文件", "*.txt")]
+        )
+        if not file_path:
+            return
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(text)
+            messagebox.showinfo("导出完成", f"已导出 Mermaid 到:\n{file_path}")
+        except Exception as exc:
+            messagebox.showerror("导出错误", f"保存失败:\n{exc}")
+
+    def copy_mermaid(self):
+        """Copy Mermaid flowchart text to clipboard for pasting into WPS"""
+        try:
+            text = self._mermaid_text()
+        except Exception as exc:
+            messagebox.showerror("复制失败", f"生成 Mermaid 失败:\n{exc}")
+            return
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            messagebox.showinfo("已复制",
+                                "Mermaid 已复制到剪贴板。\n"
+                                "在 WPS：新建/打开流程图 → 导入流程图 → 粘贴 Mermaid 文本 → 粘贴即可。")
+        except Exception as exc:
+            messagebox.showerror("复制失败", f"复制到剪贴板失败:\n{exc}")
     
     def render_img(self):
         """Render and display the FTA diagram in a new window, and update live preview with HQ"""
