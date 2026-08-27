@@ -344,7 +344,7 @@ class FTAEditorUI:
         provider_names = list(all_providers.keys())
         provider_combo = ttk.Combobox(dialog, values=provider_names, width=57, state="readonly")
         provider_combo.pack(padx=20, pady=2)
-        provider_combo.set(existing_creds.get("provider", "OpenAI") if existing_creds else "OpenAI")
+        provider_combo.set(existing_creds.get("provider", provider_names[0]) if existing_creds else provider_names[0])
         provider_hint = tk.Label(
             dialog,
             text="选择服务商后，下方模型列表会自动更新。国内/本地服务商：DeepSeek / 通义千问 / 智谱清言 / Kimi / Ollama 本地",

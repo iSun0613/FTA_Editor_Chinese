@@ -57,7 +57,7 @@ class OpenAIProvider(AIProvider):
         return "https://api.openai.com/v1"
     
     def get_default_models(self) -> List[str]:
-        return ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+        return ["gpt-5.1", "gpt-4.1", "gpt-4o-mini", "gpt-4o"]
     
     def get_available_models(self, api_key: str, endpoint: str) -> Tuple[List[str], Optional[str]]:
         """Fetch available models from OpenAI API"""
@@ -122,7 +122,7 @@ class AnthropicProvider(AIProvider):
         return "https://api.anthropic.com"
     
     def get_default_models(self) -> List[str]:
-        return ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"]
+        return ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"]
     
     def get_available_models(self, api_key: str, endpoint: str) -> Tuple[List[str], Optional[str]]:
         """Fetch available models from Anthropic API"""
@@ -197,7 +197,7 @@ class GeminiProvider(AIProvider):
         return "https://generativelanguage.googleapis.com/v1beta"
     
     def get_default_models(self) -> List[str]:
-        return ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"]
+        return ["gemini-3.6-flash", "gemini-3.1-pro-preview", "gemini-2.5-pro"]
     
     def get_available_models(self, api_key: str, endpoint: str) -> Tuple[List[str], Optional[str]]:
         """Fetch available models from Google Gemini API"""
@@ -383,11 +383,7 @@ class AIProviderFactory:
     """Factory for creating AI provider instances"""
     
     _providers = {
-        "openai": OpenAIProvider(),
-        "claude": AnthropicProvider(),
-        "anthropic": AnthropicProvider(),
-        "gemini": GeminiProvider(),
-        "google": GeminiProvider(),
+        # 国内 / 本地服务商排在前面
         "deepseek": DeepSeekProvider(),
         "qwen": QwenProvider(),
         "dashscope": QwenProvider(),  # 通义千问 / 阿里云 DashScope
@@ -396,6 +392,12 @@ class AIProviderFactory:
         "moonshot": MoonshotProvider(),
         "kimi": MoonshotProvider(),   # 月之暗面 Kimi
         "ollama": OllamaProvider(),   # 本地部署
+        # 国际服务商
+        "openai": OpenAIProvider(),
+        "claude": AnthropicProvider(),
+        "anthropic": AnthropicProvider(),
+        "gemini": GeminiProvider(),
+        "google": GeminiProvider(),
     }
     
     # Map full provider display names to internal keys
