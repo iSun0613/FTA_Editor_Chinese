@@ -27,8 +27,22 @@ from AI_agent_handler import AIAgentHandler, AICredentialManager, test_connectio
 from ai_providers import AIProviderFactory
 
 
-# UI 字体常量（微软雅黑，Windows 自带，可正常显示中文）
-UI_FONT = "Microsoft YaHei"
+# UI 字体常量（微软雅黑 UI 版，字面更现代，Windows 自带，可正常显示中文）
+UI_FONT = "Microsoft YaHei UI"
+
+# ---------- macOS 风格配色 ----------
+MAC_BG          = "#ECECEC"    # 窗口底色
+MAC_PANEL       = "#FFFFFF"    # 面板 / 控件白
+MAC_TEXT        = "#1D1D1F"    # 主文字
+MAC_TEXT_DIM    = "#86868B"    # 次要文字 / 节标题
+MAC_LINE        = "#D2D2D7"    # 分隔线
+MAC_BLUE        = "#007AFF"    # 系统蓝（强调色）
+MAC_BLUE_TINT   = "#E5EEFF"    # 蓝色浅底按钮
+MAC_BLUE_ACTIVE = "#CCE1FF"    # 蓝色按钮按下态
+MAC_RED         = "#FF3B30"    # 系统红
+MAC_RED_TINT    = "#FFE8E6"    # 红色浅底按钮
+MAC_GREEN       = "#34C759"    # 系统绿
+MAC_GREEN_TINT  = "#E4F7EA"    # 绿色浅底按钮
 
 
 class FTAEditorUI:
@@ -58,7 +72,8 @@ class FTAEditorUI:
         self.preview_scale = 1.0
         self.has_unsaved_changes = False  # Track unsaved changes
         
-        # Build UI
+        # Apply macOS-style theme, then build UI
+        self._apply_mac_theme()
         self._build_ui()
         
         # Initialize tree with root node
@@ -73,25 +88,77 @@ class FTAEditorUI:
         # Confirm before closing main window
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
     
+    def _apply_mac_theme(self):
+        """Apply macOS-style theme (window background + ttk widget styles)."""
+        self.root.configure(bg=MAC_BG)
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        # 输入框 / 下拉框：白底、灰细边、聚焦变蓝
+        style.configure("TCombobox",
+                        fieldbackground=MAC_PANEL, background="#EDEDED",
+                        foreground=MAC_TEXT, bordercolor=MAC_LINE,
+                        lightcolor=MAC_LINE, darkcolor=MAC_LINE,
+                        arrowcolor=MAC_TEXT_DIM, arrowsize=12, padding=2)
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", MAC_PANEL)],
+                  foreground=[("readonly", MAC_TEXT)],
+                  bordercolor=[("focus", MAC_BLUE)])
+        style.configure("TEntry", fieldbackground=MAC_PANEL, foreground=MAC_TEXT,
+                        bordercolor=MAC_LINE, lightcolor=MAC_LINE,
+                        darkcolor=MAC_LINE, insertcolor=MAC_TEXT, padding=2)
+        style.map("TEntry", bordercolor=[("focus", MAC_BLUE)],
+                  lightcolor=[("focus", MAC_BLUE)], darkcolor=[("focus", MAC_BLUE)])
+
+        # 树列表：白底、加大行高、选中变系统蓝
+        style.configure("Treeview", background=MAC_PANEL, fieldbackground=MAC_PANEL,
+                        foreground=MAC_TEXT, rowheight=26, borderwidth=0,
+                        font=(UI_FONT, 10))
+        style.configure("Treeview.Heading", background=MAC_PANEL,
+                        foreground=MAC_TEXT_DIM, font=(UI_FONT, 9),
+                        relief="flat", borderwidth=0, padding=(4, 4))
+        style.map("Treeview.Heading", background=[("active", MAC_PANEL)])
+        style.map("Treeview",
+                  background=[("selected", MAC_BLUE)],
+                  foreground=[("selected", "#FFFFFF")])
+
+        # 滚动条：细圆条、浅灰
+        for orient in ("Vertical", "Horizontal"):
+            style.configure(f"{orient}.TScrollbar",
+                            background="#C7C7CC", troughcolor=MAC_PANEL,
+                            bordercolor=MAC_PANEL, arrowcolor=MAC_TEXT_DIM,
+                            gripcount=0)
+            style.map(f"{orient}.TScrollbar",
+                      background=[("active", "#AFAFAF"), ("pressed", "#98989D")])
+
     def _build_ui(self):
         """Build the main UI layout"""
         # Build top bar with metadata fields
         self._build_top_bar()
         
         # Main horizontal paned window (left: tree+diagram+details, right: AI chat)
-        main_horizontal_paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        main_horizontal_paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL,
+                                               bg=MAC_BG, bd=0, sashwidth=6,
+                                               sashrelief=tk.FLAT)
         main_horizontal_paned.pack(fill=tk.BOTH, expand=True)
-        
+
         # Left section container
-        left_container = tk.Frame(main_horizontal_paned)
+        left_container = tk.Frame(main_horizontal_paned, bg=MAC_BG)
         main_horizontal_paned.add(left_container, stretch="always", minsize=600)
-        
+
         # Main vertical paned window (top: tree+diagram, bottom: details+buttons)
-        main_vertical_paned = tk.PanedWindow(left_container, orient=tk.VERTICAL)
+        main_vertical_paned = tk.PanedWindow(left_container, orient=tk.VERTICAL,
+                                             bg=MAC_BG, bd=0, sashwidth=6,
+                                             sashrelief=tk.FLAT)
         main_vertical_paned.pack(fill=tk.BOTH, expand=True)
-        
+
         # Top section: horizontal paned (tree | diagram)
-        top_paned = tk.PanedWindow(main_vertical_paned, orient=tk.HORIZONTAL)
+        top_paned = tk.PanedWindow(main_vertical_paned, orient=tk.HORIZONTAL,
+                                   bg=MAC_BG, bd=0, sashwidth=6,
+                                   sashrelief=tk.FLAT)
         main_vertical_paned.add(top_paned, stretch="always")
         
         # Build left panel (tree)
@@ -111,11 +178,12 @@ class FTAEditorUI:
     
     def _build_top_bar(self):
         """Build the top bar with mode selector, title, and date"""
-        top_frame = tk.Frame(self.root, relief=tk.RAISED, borderwidth=2, bg="#f0f0f0")
-        top_frame.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
-        
+        top_frame = tk.Frame(self.root, relief=tk.FLAT, bg=MAC_PANEL)
+        top_frame.pack(side=tk.TOP, fill=tk.X)
+
         # Mode selector
-        tk.Label(top_frame, text="模式:", font=(UI_FONT, 10, "bold"), bg="#f0f0f0").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(top_frame, text="模式:", font=(UI_FONT, 10),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(side=tk.LEFT, padx=(14, 5), pady=8)
         self.mode_var = tk.StringVar(value=self.core.mode)
         mode_combo = ttk.Combobox(top_frame, textvariable=self.mode_var, 
                                   values=["FTA", "ETA"], state="readonly", width=10)
@@ -123,37 +191,52 @@ class FTAEditorUI:
         mode_combo.bind("<<ComboboxSelected>>", self._on_mode_changed)
         
         # Title field
-        tk.Label(top_frame, text="标题:", font=(UI_FONT, 10, "bold"), bg="#f0f0f0").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(top_frame, text="标题:", font=(UI_FONT, 10),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(side=tk.LEFT, padx=(10, 5))
         self.title_var = tk.StringVar(value=self.core.title)
-        title_entry = tk.Entry(top_frame, textvariable=self.title_var, width=30, font=(UI_FONT, 10))
-        title_entry.pack(side=tk.LEFT, padx=(0, 20))
+        title_entry = tk.Entry(top_frame, textvariable=self.title_var, width=30,
+                               font=(UI_FONT, 10), relief=tk.FLAT, highlightthickness=1,
+                               highlightbackground=MAC_LINE, highlightcolor=MAC_BLUE)
+        title_entry.pack(side=tk.LEFT, padx=(0, 20), pady=6)
         title_entry.bind("<FocusOut>", self._on_title_changed)
         title_entry.bind("<Return>", self._on_title_changed)
-        
+
         # Date field
-        tk.Label(top_frame, text="日期:", font=(UI_FONT, 10, "bold"), bg="#f0f0f0").pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(top_frame, text="日期:", font=(UI_FONT, 10),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(side=tk.LEFT, padx=(10, 5))
         self.date_var = tk.StringVar(value=self.core.date)
-        date_entry = tk.Entry(top_frame, textvariable=self.date_var, width=15, font=(UI_FONT, 10))
-        date_entry.pack(side=tk.LEFT, padx=(0, 20))
+        date_entry = tk.Entry(top_frame, textvariable=self.date_var, width=15,
+                              font=(UI_FONT, 10), relief=tk.FLAT, highlightthickness=1,
+                              highlightbackground=MAC_LINE, highlightcolor=MAC_BLUE)
+        date_entry.pack(side=tk.LEFT, padx=(0, 20), pady=6)
         date_entry.bind("<FocusOut>", self._on_date_changed)
         date_entry.bind("<Return>", self._on_date_changed)
-        
+
         # Hide zero probability nodes option
         self.hide_zero_var = tk.BooleanVar(value=False)
-        hide_zero_cb = tk.Checkbutton(top_frame, text="隐藏零概率节点", variable=self.hide_zero_var, 
-                                      bg="#f0f0f0", command=self._on_hide_zero_changed)
+        hide_zero_cb = tk.Checkbutton(top_frame, text="隐藏零概率节点", variable=self.hide_zero_var,
+                                      bg=MAC_PANEL, activebackground=MAC_PANEL,
+                                      font=(UI_FONT, 10), fg=MAC_TEXT,
+                                      command=self._on_hide_zero_changed)
         hide_zero_cb.pack(side=tk.LEFT, padx=(10, 10))
 
         # 渲染选项：概率文字 / 事件之间门符号（区别于原作者默认习惯，可按需开关并持久化）
         self.show_probability_var = tk.BooleanVar(value=False)
         prob_cb = tk.Checkbutton(top_frame, text="显示概率文字", variable=self.show_probability_var,
-                                 bg="#f0f0f0", command=self._save_render_options)
+                                 bg=MAC_PANEL, activebackground=MAC_PANEL,
+                                 font=(UI_FONT, 10), fg=MAC_TEXT,
+                                 command=self._save_render_options)
         prob_cb.pack(side=tk.LEFT, padx=(2, 10))
 
         self.gate_shape_var = tk.BooleanVar(value=True)
         gate_cb = tk.Checkbutton(top_frame, text="事件间显示门符号", variable=self.gate_shape_var,
-                                 bg="#f0f0f0", command=self._save_render_options)
+                                 bg=MAC_PANEL, activebackground=MAC_PANEL,
+                                 font=(UI_FONT, 10), fg=MAC_TEXT,
+                                 command=self._save_render_options)
         gate_cb.pack(side=tk.LEFT, padx=(2, 10))
+
+        # 顶栏底部 1px 分隔线（macOS 工具栏风格）
+        tk.Frame(self.root, height=1, bg=MAC_LINE).pack(side=tk.TOP, fill=tk.X)
 
         self._render_options_file = Path.home() / ".fta_editor_render.json"
         self._load_render_options()
@@ -211,22 +294,20 @@ class FTAEditorUI:
     
     def _build_tree_panel(self, parent):
         """Build the fault tree panel"""
-        tree_frame = tk.Frame(parent, relief=tk.SUNKEN, borderwidth=2)
+        tree_frame = tk.Frame(parent, bg=MAC_PANEL, relief=tk.FLAT)
         parent.add(tree_frame, stretch="always")
-        
-        tk.Label(tree_frame, text="故障树", font=(UI_FONT, 12, "bold")).pack(pady=5)
-        
+
+        tk.Label(tree_frame, text="故障树", font=(UI_FONT, 11),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(pady=(10, 4))
+
         self.fta_tree = ttk.Treeview(tree_frame, columns=("mark",), show="tree headings")
         self.fta_tree.heading("mark", text="")
         self.fta_tree.column("mark", width=20, anchor="center", stretch=False)
-        self.fta_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.fta_tree.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
         self.fta_tree.bind("<<TreeviewSelect>>", self.show_selected_details)
-        
-        # Configure visual tags - support arbitrary depths
-        colors = ["#d0f0e0", "#ffe4b5", "#e6e6fa", "#c8d6e5", "#f5f5dc", "#e0ffff", "#ffe4e1", "#f0f8ff"]
-        for i in range(20):  # Support up to 20 levels
-            color = colors[i % len(colors)]
-            self.fta_tree.tag_configure(f"level{i}", background=color)
+
+        # macOS 风格：层级用缩进区分，不再铺彩色背景；根节点加粗突出
+        self.fta_tree.tag_configure("level0", font=(UI_FONT, 10, "bold"))
         
         base_font = tkfont.nametofont("TkDefaultFont")
         marked_font = tkfont.Font(
@@ -237,23 +318,24 @@ class FTAEditorUI:
         )
         
         # Blue highlight for zero probability nodes
-        self.fta_tree.tag_configure("zero_prob", foreground="blue")
-        
+        self.fta_tree.tag_configure("zero_prob", foreground=MAC_BLUE)
+
         # Bold red highlight for probability 1.0 nodes
-        self.fta_tree.tag_configure("full_prob", foreground="red", font=marked_font)
+        self.fta_tree.tag_configure("full_prob", foreground=MAC_RED, font=marked_font)
     
     def _build_diagram_panel(self, parent):
         """Build the live diagram preview panel"""
-        diagram_frame = tk.Frame(parent, relief=tk.SUNKEN, borderwidth=2)
+        diagram_frame = tk.Frame(parent, bg=MAC_PANEL, relief=tk.FLAT)
         parent.add(diagram_frame, stretch="always")
-        
-        tk.Label(diagram_frame, text="实时图形预览", font=(UI_FONT, 12, "bold")).pack(pady=5)
-        
-        canvas_frame = tk.Frame(diagram_frame)
-        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        h_scroll = tk.Scrollbar(canvas_frame, orient=tk.HORIZONTAL)
-        v_scroll = tk.Scrollbar(canvas_frame)
+
+        tk.Label(diagram_frame, text="实时图形预览", font=(UI_FONT, 11),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(pady=(10, 4))
+
+        canvas_frame = tk.Frame(diagram_frame, bg=MAC_PANEL)
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+
+        h_scroll = ttk.Scrollbar(canvas_frame, orient=tk.HORIZONTAL)
+        v_scroll = ttk.Scrollbar(canvas_frame)
         h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
         v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
@@ -278,83 +360,106 @@ class FTAEditorUI:
     
     def _build_details_panel(self, parent):
         """Build the node details panel"""
-        bottom_frame = tk.Frame(parent)
+        bottom_frame = tk.Frame(parent, bg=MAC_BG)
         parent.add(bottom_frame, height=150)
-        
-        self.details_frame = tk.Frame(bottom_frame, relief=tk.SUNKEN, borderwidth=2)
-        self.details_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        tk.Label(self.details_frame, text="节点详情", font=(UI_FONT, 12, "bold")).pack(pady=5)
-        self.details_text = tk.Text(self.details_frame, height=8, width=80)
-        self.details_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+
+        self.details_frame = tk.Frame(bottom_frame, bg=MAC_PANEL, relief=tk.FLAT)
+        self.details_frame.pack(fill=tk.BOTH, expand=True, padx=(0, 6), pady=(0, 6))
+
+        tk.Label(self.details_frame, text="节点详情", font=(UI_FONT, 11),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(pady=(10, 4))
+        self.details_text = tk.Text(self.details_frame, height=8, width=80,
+                                    bg=MAC_PANEL, fg=MAC_TEXT, relief=tk.FLAT,
+                                    bd=0, font=(UI_FONT, 10), insertbackground=MAC_TEXT)
+        self.details_text.pack(padx=12, pady=(0, 8), fill=tk.BOTH, expand=True)
     
     def _build_ai_chat_panel(self, parent):
         """Build the AI chat panel on the right side"""
-        chat_frame = tk.Frame(parent, relief=tk.SUNKEN, borderwidth=2)
+        chat_frame = tk.Frame(parent, bg=MAC_PANEL, relief=tk.FLAT)
         parent.add(chat_frame, minsize=300, stretch="never")
-        
+
         # Title and settings
-        title_frame = tk.Frame(chat_frame, bg="#e6f3ff")
-        title_frame.pack(fill=tk.X, padx=2, pady=2)
-        
-        tk.Label(title_frame, text="AI 助手", font=(UI_FONT, 12, "bold"), 
-                bg="#e6f3ff").pack(side=tk.LEFT, padx=5, pady=5)
-        
+        title_frame = tk.Frame(chat_frame, bg=MAC_PANEL)
+        title_frame.pack(fill=tk.X, padx=12, pady=(12, 6))
+
+        tk.Label(title_frame, text="AI 助手", font=(UI_FONT, 11),
+                fg=MAC_TEXT_DIM, bg=MAC_PANEL).pack(side=tk.LEFT)
+
         # Settings button
         settings_btn = tk.Button(title_frame, text="⚙", font=(UI_FONT, 10),
-                                command=self._show_ai_settings, width=3)
-        settings_btn.pack(side=tk.RIGHT, padx=5, pady=2)
-        
+                                command=self._show_ai_settings, width=3,
+                                bg=MAC_PANEL, fg=MAC_TEXT_DIM, relief=tk.FLAT, bd=0,
+                                activebackground=MAC_PANEL, activeforeground=MAC_BLUE,
+                                cursor="hand2")
+        settings_btn.pack(side=tk.RIGHT, padx=2)
+
         # Status indicator
         self.ai_status_label = tk.Label(title_frame, text="●", font=(UI_FONT, 10),
-                                        fg="gray", bg="#e6f3ff")
+                                        fg=MAC_TEXT_DIM, bg=MAC_PANEL)
         self.ai_status_label.pack(side=tk.RIGHT, padx=2)
         self._update_ai_status()
-        
+
         # Chat history display
-        chat_history_frame = tk.Frame(chat_frame)
-        chat_history_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
+        chat_history_frame = tk.Frame(chat_frame, bg=MAC_PANEL)
+        chat_history_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+
         # Scrollbar for chat history
-        chat_scroll = tk.Scrollbar(chat_history_frame)
+        chat_scroll = ttk.Scrollbar(chat_history_frame)
         chat_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        self.chat_display = tk.Text(chat_history_frame, wrap=tk.WORD, 
-                                    state=tk.DISABLED, bg="#fafafa",
+
+        self.chat_display = tk.Text(chat_history_frame, wrap=tk.WORD,
+                                    state=tk.DISABLED, bg=MAC_PANEL, fg=MAC_TEXT,
+                                    relief=tk.FLAT, bd=0, font=(UI_FONT, 10),
                                     yscrollcommand=chat_scroll.set)
         self.chat_display.pack(fill=tk.BOTH, expand=True)
         chat_scroll.config(command=self.chat_display.yview)
-        
+
         # Configure text tags for styling
-        self.chat_display.tag_configure("user", foreground="#0066cc", font=(UI_FONT, 10, "bold"))
-        self.chat_display.tag_configure("assistant", foreground="#006600", font=(UI_FONT, 10))
-        self.chat_display.tag_configure("system", foreground="#666666", font=(UI_FONT, 9, "italic"))
-        self.chat_display.tag_configure("error", foreground="#cc0000", font=(UI_FONT, 10))
-        self.chat_display.tag_configure("suggestion", foreground="#996600", 
-                                        font=(UI_FONT, 10, "bold"), background="#fff3cd")
-        
+        self.chat_display.tag_configure("user", foreground=MAC_BLUE, font=(UI_FONT, 10, "bold"))
+        self.chat_display.tag_configure("assistant", foreground=MAC_TEXT, font=(UI_FONT, 10))
+        self.chat_display.tag_configure("system", foreground=MAC_TEXT_DIM, font=(UI_FONT, 9, "italic"))
+        self.chat_display.tag_configure("error", foreground=MAC_RED, font=(UI_FONT, 10))
+        self.chat_display.tag_configure("suggestion", foreground="#B25000",
+                                        font=(UI_FONT, 10, "bold"), background="#FFF4E0")
+
         # Quick action buttons
-        quick_actions_frame = tk.Frame(chat_frame)
-        quick_actions_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        tk.Button(quick_actions_frame, text="分析故障树", 
-                 command=self._ai_quick_analysis, bg="#d4edda").pack(side=tk.LEFT, padx=2)
-        tk.Button(quick_actions_frame, text="更新故障树", 
-                 command=self._ai_update_fta, bg="#d4edda").pack(side=tk.LEFT, padx=2)
-        tk.Button(quick_actions_frame, text="清空对话", 
-                 command=self._clear_chat, bg="#f8d7da").pack(side=tk.RIGHT, padx=2)
-        
+        quick_actions_frame = tk.Frame(chat_frame, bg=MAC_PANEL)
+        quick_actions_frame.pack(fill=tk.X, padx=8, pady=2)
+
+        tk.Button(quick_actions_frame, text="分析故障树",
+                 command=self._ai_quick_analysis, bg=MAC_BLUE_TINT, fg=MAC_BLUE,
+                 activebackground=MAC_BLUE_ACTIVE, activeforeground=MAC_BLUE,
+                 relief=tk.FLAT, bd=0, font=(UI_FONT, 10), padx=10, pady=3,
+                 cursor="hand2").pack(side=tk.LEFT, padx=2)
+        tk.Button(quick_actions_frame, text="更新故障树",
+                 command=self._ai_update_fta, bg=MAC_BLUE_TINT, fg=MAC_BLUE,
+                 activebackground=MAC_BLUE_ACTIVE, activeforeground=MAC_BLUE,
+                 relief=tk.FLAT, bd=0, font=(UI_FONT, 10), padx=10, pady=3,
+                 cursor="hand2").pack(side=tk.LEFT, padx=2)
+        tk.Button(quick_actions_frame, text="清空对话",
+                 command=self._clear_chat, bg=MAC_RED_TINT, fg=MAC_RED,
+                 activebackground="#FFD2CE", activeforeground=MAC_RED,
+                 relief=tk.FLAT, bd=0, font=(UI_FONT, 10), padx=10, pady=3,
+                 cursor="hand2").pack(side=tk.RIGHT, padx=2)
+
         # Message input area
-        input_frame = tk.Frame(chat_frame)
-        input_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        self.chat_input = tk.Text(input_frame, height=3, wrap=tk.WORD)
+        input_frame = tk.Frame(chat_frame, bg=MAC_PANEL)
+        input_frame.pack(fill=tk.X, padx=8, pady=(4, 10))
+
+        self.chat_input = tk.Text(input_frame, height=3, wrap=tk.WORD,
+                                  bg=MAC_PANEL, fg=MAC_TEXT, relief=tk.FLAT,
+                                  highlightthickness=1, highlightbackground=MAC_LINE,
+                                  highlightcolor=MAC_BLUE, font=(UI_FONT, 10),
+                                  insertbackground=MAC_TEXT)
         self.chat_input.pack(fill=tk.X, side=tk.LEFT, expand=True, padx=(0, 5))
         self.chat_input.bind("<Return>", self._on_chat_enter)
         self.chat_input.bind("<Shift-Return>", lambda e: None)  # Allow Shift+Enter for newline
-        
+
         send_btn = tk.Button(input_frame, text="发送", command=self._send_chat_message,
-                            bg="#007bff", fg="white", width=8)
+                            bg=MAC_BLUE, fg="white", width=8,
+                            activebackground="#0066D6", activeforeground="white",
+                            relief=tk.FLAT, bd=0, font=(UI_FONT, 10),
+                            cursor="hand2")
         send_btn.pack(side=tk.RIGHT)
         
         # Add welcome message
@@ -363,9 +468,9 @@ class FTAEditorUI:
     def _update_ai_status(self):
         """Update the AI status indicator"""
         if self.ai_agent.is_configured():
-            self.ai_status_label.config(fg="green", text="●")
+            self.ai_status_label.config(fg=MAC_GREEN, text="●")
         else:
-            self.ai_status_label.config(fg="gray", text="○")
+            self.ai_status_label.config(fg=MAC_TEXT_DIM, text="○")
     
     def _show_ai_settings(self):
         """Show AI settings dialog"""
@@ -374,30 +479,36 @@ class FTAEditorUI:
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.geometry("550x480")
-        
-        tk.Label(dialog, text="AI API 配置", font=(UI_FONT, 12, "bold")).pack(pady=10)
+        dialog.configure(bg=MAC_PANEL)
+
+        tk.Label(dialog, text="AI API 配置", font=(UI_FONT, 13, "bold"),
+                 bg=MAC_PANEL, fg=MAC_TEXT).pack(pady=(14, 6))
         
         # Load existing credentials if available
         cred_manager = AICredentialManager()
         existing_creds, _ = cred_manager.load_credentials()
         
         # Provider selection
-        tk.Label(dialog, text="AI 服务商:").pack(anchor="w", padx=20, pady=(10, 0))
+        tk.Label(dialog, text="AI 服务商:", font=(UI_FONT, 10),
+                 bg=MAC_PANEL, fg=MAC_TEXT).pack(anchor="w", padx=24, pady=(10, 0))
         all_providers = AIProviderFactory.get_all_providers()
         provider_names = list(all_providers.keys())
         provider_combo = ttk.Combobox(dialog, values=provider_names, width=57, state="readonly")
-        provider_combo.pack(padx=20, pady=2)
+        provider_combo.pack(padx=24, pady=2, fill="x")
         provider_combo.set(existing_creds.get("provider", provider_names[0]) if existing_creds else provider_names[0])
         provider_hint = tk.Label(
             dialog,
             text="选择服务商后，下方模型列表会自动更新。国内/本地服务商：DeepSeek / 通义千问 / 智谱清言 / Kimi / Ollama 本地",
-            font=(UI_FONT, 8), fg="#888888", justify="left")
-        provider_hint.pack(anchor="w", padx=20)
+            font=(UI_FONT, 8), fg=MAC_TEXT_DIM, bg=MAC_PANEL, justify="left")
+        provider_hint.pack(anchor="w", padx=24)
         
         # API Key
-        tk.Label(dialog, text="API 密钥:").pack(anchor="w", padx=20, pady=(10, 0))
-        api_key_entry = tk.Entry(dialog, width=60, show="*")
-        api_key_entry.pack(padx=20, pady=2)
+        tk.Label(dialog, text="API 密钥:", font=(UI_FONT, 10),
+                 bg=MAC_PANEL, fg=MAC_TEXT).pack(anchor="w", padx=24, pady=(10, 0))
+        api_key_entry = tk.Entry(dialog, width=60, show="*", relief=tk.FLAT, bd=0,
+                                 highlightthickness=1, highlightbackground=MAC_LINE,
+                                 highlightcolor=MAC_BLUE, insertbackground=MAC_TEXT)
+        api_key_entry.pack(padx=24, pady=2, ipady=3)
         if existing_creds:
             api_key_entry.insert(0, existing_creds.get("api_key", ""))
         
@@ -406,20 +517,27 @@ class FTAEditorUI:
         def toggle_show_key():
             api_key_entry.config(show="" if show_key_var.get() else "*")
         tk.Checkbutton(dialog, text="显示 API 密钥", variable=show_key_var, 
-                      command=toggle_show_key).pack(anchor="w", padx=20)
+                      command=toggle_show_key, font=(UI_FONT, 9),
+                      bg=MAC_PANEL, fg=MAC_TEXT, activebackground=MAC_PANEL,
+                      activeforeground=MAC_TEXT, highlightthickness=0,
+                      bd=0).pack(anchor="w", padx=24)
         
         # API Endpoint
-        tk.Label(dialog, text="API 端点:").pack(anchor="w", padx=20, pady=(10, 0))
-        endpoint_entry = tk.Entry(dialog, width=60)
-        endpoint_entry.pack(padx=20, pady=2)
+        tk.Label(dialog, text="API 端点:", font=(UI_FONT, 10),
+                 bg=MAC_PANEL, fg=MAC_TEXT).pack(anchor="w", padx=24, pady=(10, 0))
+        endpoint_entry = tk.Entry(dialog, width=60, relief=tk.FLAT, bd=0,
+                                  highlightthickness=1, highlightbackground=MAC_LINE,
+                                  highlightcolor=MAC_BLUE, insertbackground=MAC_TEXT)
+        endpoint_entry.pack(padx=24, pady=2, ipady=3)
         
         # Status label - MUST be defined before functions that use it
-        status_label = tk.Label(dialog, text="", font=(UI_FONT, 9))
+        status_label = tk.Label(dialog, text="", font=(UI_FONT, 9),
+                                bg=MAC_PANEL, fg=MAC_TEXT_DIM)
         status_label.pack(pady=10)
         
         # Model dropdown with refresh button
-        model_frame = tk.Frame(dialog)
-        model_frame.pack(padx=20, pady=2, fill="x")
+        model_frame = tk.Frame(dialog, bg=MAC_PANEL)
+        model_frame.pack(padx=24, pady=2, fill="x")
         model_combo = ttk.Combobox(model_frame, width=50)
         model_combo.pack(side="left", fill="x", expand=True)
         
@@ -429,19 +547,19 @@ class FTAEditorUI:
             api_key = api_key_entry.get().strip()
             
             if not selected_provider:
-                status_label.config(text="请先选择服务商", fg="red")
+                status_label.config(text="请先选择服务商", fg=MAC_RED)
                 return
             
             if not api_key:
-                status_label.config(text="请先输入 API 密钥", fg="red")
+                status_label.config(text="请先输入 API 密钥", fg=MAC_RED)
                 return
             
             provider = all_providers.get(selected_provider)
             if not provider:
-                status_label.config(text="未找到该服务商", fg="red")
+                status_label.config(text="未找到该服务商", fg=MAC_RED)
                 return
             
-            status_label.config(text="正在获取可用模型...", fg="blue")
+            status_label.config(text="正在获取可用模型...", fg=MAC_BLUE)
             endpoint = endpoint_entry.get().strip()
             
             def _fetch_worker():
@@ -462,9 +580,9 @@ class FTAEditorUI:
                     return
                 available_models, fetch_error = result
                 if fetch_error:
-                    status_label.config(text=f"注意: {fetch_error}", fg="orange")
+                    status_label.config(text=f"注意: {fetch_error}", fg="#B25000")
                 else:
-                    status_label.config(text="模型加载成功", fg="green")
+                    status_label.config(text="模型加载成功", fg=MAC_GREEN)
                 
                 model_combo['values'] = available_models
                 if available_models:
@@ -472,10 +590,14 @@ class FTAEditorUI:
             
             threading.Thread(target=_fetch_worker, daemon=True).start()
         
-        refresh_btn = tk.Button(model_frame, text="↻", command=refresh_models, width=3)
+        refresh_btn = tk.Button(model_frame, text="↻", command=refresh_models, width=3,
+                                bg=MAC_BLUE_TINT, fg=MAC_BLUE,
+                                activebackground=MAC_BLUE_ACTIVE, activeforeground=MAC_BLUE,
+                                relief=tk.FLAT, bd=0, font=(UI_FONT, 10), cursor="hand2")
         refresh_btn.pack(side="right", padx=(5, 0))
         
-        tk.Label(dialog, text="模型:").pack(anchor="w", padx=20, pady=(10, 0))
+        tk.Label(dialog, text="模型:", font=(UI_FONT, 10),
+                 bg=MAC_PANEL, fg=MAC_TEXT).pack(anchor="w", padx=24, pady=(10, 0))
         
         # Function to update endpoint and models when provider changes
         def update_provider_options(*args):
@@ -490,7 +612,7 @@ class FTAEditorUI:
                 
                 # Try to fetch available models dynamically (async to avoid freezing the dialog)
                 if api_key:
-                    status_label.config(text="正在获取可用模型...", fg="blue")
+                    status_label.config(text="正在获取可用模型...", fg=MAC_BLUE)
                     
                     def _provider_fetch_worker(provider=provider, api_key=api_key, endpoint=endpoint):
                         try:
@@ -510,9 +632,9 @@ class FTAEditorUI:
                             return
                         available_models, fetch_error = result
                         if fetch_error:
-                            status_label.config(text=f"使用默认模型: {fetch_error}", fg="orange")
+                            status_label.config(text=f"使用默认模型: {fetch_error}", fg="#B25000")
                         else:
-                            status_label.config(text="", fg="black")
+                            status_label.config(text="", fg=MAC_TEXT)
                         
                         model_combo['values'] = available_models
                         if available_models:
@@ -542,22 +664,22 @@ class FTAEditorUI:
             model = model_combo.get().strip()
             
             if not provider_name:
-                status_label.config(text="请选择 AI 服务商", fg="red")
+                status_label.config(text="请选择 AI 服务商", fg=MAC_RED)
                 return
             
             if not api_key:
-                status_label.config(text="请输入 API 密钥", fg="red")
+                status_label.config(text="请输入 API 密钥", fg=MAC_RED)
                 return
             
             if not endpoint:
-                status_label.config(text="请输入 API 端点", fg="red")
+                status_label.config(text="请输入 API 端点", fg=MAC_RED)
                 return
             
             if not model:
-                status_label.config(text="请选择模型", fg="red")
+                status_label.config(text="请选择模型", fg=MAC_RED)
                 return
             
-            status_label.config(text="正在测试连接...", fg="blue")
+            status_label.config(text="正在测试连接...", fg=MAC_BLUE)
             
             def _test_worker():
                 try:
@@ -580,14 +702,14 @@ class FTAEditorUI:
                     # Save credentials
                     save_success, save_error = self.ai_agent.configure(api_key, endpoint, model, provider_name)
                     if save_success:
-                        status_label.config(text="✓ 配置保存成功！", fg="green")
+                        status_label.config(text="✓ 配置保存成功！", fg=MAC_GREEN)
                         self._update_ai_status()
                         self._add_chat_message("system", f"✓ {provider_name} AI 配置成功！你现在可以询问关于故障树的问题。")
                         dialog.after(1500, dialog.destroy)
                     else:
-                        status_label.config(text=f"保存失败: {save_error}", fg="red")
+                        status_label.config(text=f"保存失败: {save_error}", fg=MAC_RED)
                 else:
-                    status_label.config(text=f"✗ {message}", fg="red")
+                    status_label.config(text=f"✗ {message}", fg=MAC_RED)
             
             threading.Thread(target=_test_worker, daemon=True).start()
         
@@ -595,27 +717,33 @@ class FTAEditorUI:
             success, error = cred_manager.delete_credentials()
             if success:
                 api_key_entry.delete(0, tk.END)
-                status_label.config(text="凭据已清除", fg="blue")
+                status_label.config(text="凭据已清除", fg=MAC_BLUE)
                 self._update_ai_status()
             else:
-                status_label.config(text=f"错误: {error}", fg="red")
+                status_label.config(text=f"错误: {error}", fg=MAC_RED)
         
         # Buttons
-        btn_frame = tk.Frame(dialog)
+        btn_frame = tk.Frame(dialog, bg=MAC_PANEL)
         btn_frame.pack(pady=20)
         
-        tk.Button(btn_frame, text="测试并保存", command=test_and_save, 
-                 bg="#28a745", fg="white", width=15).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="清除", command=clear_credentials,
-                 bg="#dc3545", fg="white", width=15).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="取消", command=dialog.destroy,
-                 width=15).pack(side=tk.LEFT, padx=5)
+        def _dlg_btn(parent, text, cmd, bg, fg, active):
+            return tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg,
+                             activebackground=active, activeforeground=fg,
+                             relief=tk.FLAT, bd=0, font=(UI_FONT, 10),
+                             padx=14, pady=5, cursor="hand2")
+        _dlg_btn(btn_frame, "测试并保存", test_and_save,
+                 MAC_GREEN_TINT, MAC_GREEN, "#D3F2DD").pack(side=tk.LEFT, padx=5)
+        _dlg_btn(btn_frame, "清除", clear_credentials,
+                 MAC_RED_TINT, MAC_RED, "#FFD2CE").pack(side=tk.LEFT, padx=5)
+        _dlg_btn(btn_frame, "取消", dialog.destroy,
+                 MAC_BG, MAC_TEXT, "#DFDFDF").pack(side=tk.LEFT, padx=5)
         
         # Info text
         info_text = ("提示：您的 API 密钥仅保存在本地，位于：\n"
                     f"{cred_manager.CREDENTIALS_FILE}\n"
                     "它永远不会被上传或共享。")
-        tk.Label(dialog, text=info_text, font=(UI_FONT, 8), fg="gray").pack(pady=5)
+        tk.Label(dialog, text=info_text, font=(UI_FONT, 8),
+                 fg=MAC_TEXT_DIM, bg=MAC_PANEL, justify="left").pack(pady=5)
     
     def _add_chat_message(self, role: str, message: str):
         """Add a message to the chat display"""
@@ -727,19 +855,26 @@ class FTAEditorUI:
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.geometry("600x400")
+        dialog.configure(bg=MAC_PANEL)
         
         tk.Label(dialog, text="AI 提出了以下更改建议:", 
-                font=(UI_FONT, 11, "bold")).pack(pady=10)
+                font=(UI_FONT, 11, "bold"),
+                bg=MAC_PANEL, fg=MAC_TEXT).pack(pady=(12, 8))
         
         # List of changes
-        changes_frame = tk.Frame(dialog)
-        changes_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        changes_frame = tk.Frame(dialog, bg=MAC_PANEL)
+        changes_frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=5)
         
-        scroll = tk.Scrollbar(changes_frame)
+        scroll = ttk.Scrollbar(changes_frame)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
         changes_list = tk.Listbox(changes_frame, height=10, yscrollcommand=scroll.set,
-                                  selectmode=tk.MULTIPLE)
+                                  selectmode=tk.MULTIPLE, relief=tk.FLAT, bd=0,
+                                  bg=MAC_PANEL, fg=MAC_TEXT, font=(UI_FONT, 10),
+                                  highlightthickness=1, highlightbackground=MAC_LINE,
+                                  highlightcolor=MAC_BLUE,
+                                  selectbackground=MAC_BLUE, selectforeground="#FFFFFF",
+                                  activestyle="none")
         changes_list.pack(fill=tk.BOTH, expand=True)
         scroll.config(command=changes_list.yview)
         
@@ -751,9 +886,13 @@ class FTAEditorUI:
             changes_list.selection_set(i)  # Select all by default
         
         # Details text
-        tk.Label(dialog, text="更改详情:", font=(UI_FONT, 10, "bold")).pack(anchor="w", padx=10)
-        details_text = tk.Text(dialog, height=6, wrap=tk.WORD)
-        details_text.pack(fill=tk.X, padx=10, pady=5)
+        tk.Label(dialog, text="更改详情:", font=(UI_FONT, 10, "bold"),
+                 bg=MAC_PANEL, fg=MAC_TEXT).pack(anchor="w", padx=12)
+        details_text = tk.Text(dialog, height=6, wrap=tk.WORD, relief=tk.FLAT, bd=0,
+                               bg=MAC_PANEL, fg=MAC_TEXT, font=(UI_FONT, 10),
+                               highlightthickness=1, highlightbackground=MAC_LINE,
+                               highlightcolor=MAC_BLUE, insertbackground=MAC_TEXT)
+        details_text.pack(fill=tk.X, padx=12, pady=5)
         
         def show_details(event):
             selection = changes_list.curselection()
@@ -792,16 +931,22 @@ class FTAEditorUI:
             dialog.destroy()
         
         # Buttons
-        btn_frame = tk.Frame(dialog)
+        btn_frame = tk.Frame(dialog, bg=MAC_PANEL)
         btn_frame.pack(pady=10)
         
         tk.Button(btn_frame, text="应用所选", command=apply_selected,
-                 bg="#28a745", fg="white", width=15).pack(side=tk.LEFT, padx=5)
+                 bg=MAC_GREEN_TINT, fg=MAC_GREEN,
+                 activebackground="#D3F2DD", activeforeground=MAC_GREEN,
+                 relief=tk.FLAT, bd=0, font=(UI_FONT, 10),
+                 padx=14, pady=5, cursor="hand2").pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="取消", command=dialog.destroy,
-                 width=15).pack(side=tk.LEFT, padx=5)
+                 bg=MAC_BG, fg=MAC_TEXT, activebackground="#DFDFDF",
+                 activeforeground=MAC_TEXT, relief=tk.FLAT, bd=0,
+                 font=(UI_FONT, 10), padx=14, pady=5,
+                 cursor="hand2").pack(side=tk.LEFT, padx=5)
         
         tk.Label(dialog, text="⚠️ 请谨慎审查更改后再应用。", 
-                font=(UI_FONT, 9), fg="orange").pack(pady=5)
+                font=(UI_FONT, 9), fg="#B25000", bg=MAC_PANEL).pack(pady=5)
     
     def _apply_change(self, change: 'AIProposedChange') -> bool:
         """Apply a single proposed change to the FTA"""
@@ -1064,27 +1209,40 @@ class FTAEditorUI:
 
     def _build_button_bar(self):
         """Build the button bar at the bottom"""
-        button_frame = tk.Frame(self.root)
+        button_frame = tk.Frame(self.root, bg=MAC_BG)
         button_frame.pack(fill=tk.X)
-        
-        buttons = [
-            ("新建分析", "#90EE90", self.new_analysis),
-            ("(A)添加节点", "#20b2aa", self.add_node),
-            ("(E)编辑节点", "#66cdaa", self.edit_node),
-            ("(D)删除节点", "#8fbc8f", self.delete_node),
-            ("载入JSON", "#b0c4de", self.load_json),
-            ("(S)另存JSON", "#b0e0e6", self.save_json_as),
-            ("导出XML", "#dda0dd", self.export_to_xml),
-            ("导出Excel", "#f0e68c", self.export_to_excel),
-            ("导出Mermaid", "#8dd9a0", self.export_to_mermaid),
-            ("复制Mermaid", "#7fd4c1", self.copy_mermaid),
-            ("(R)渲染图形", "#87CEEB", self.render_img)
+
+        # macOS 风格按钮：树操作蓝色调、文件操作中性白、删除红色调、渲染绿色调
+        def _btn(text, cmd, bg, fg, active):
+            return tk.Button(button_frame, text=text, command=cmd,
+                             bg=bg, fg=fg, activebackground=active, activeforeground=fg,
+                             relief=tk.FLAT, bd=0, font=(UI_FONT, 10),
+                             padx=12, pady=4, cursor="hand2")
+
+        groups = [
+            [  # 树操作
+                ("新建分析", self.new_analysis, MAC_BLUE_TINT, MAC_BLUE, MAC_BLUE_ACTIVE),
+                ("添加节点 (A)", self.add_node, MAC_BLUE_TINT, MAC_BLUE, MAC_BLUE_ACTIVE),
+                ("编辑节点 (E)", self.edit_node, MAC_BLUE_TINT, MAC_BLUE, MAC_BLUE_ACTIVE),
+                ("删除节点 (D)", self.delete_node, MAC_RED_TINT, MAC_RED, "#FFD2CE"),
+            ],
+            [  # 文件与导出
+                ("载入 JSON", self.load_json, MAC_PANEL, MAC_TEXT, "#E8E8ED"),
+                ("另存 JSON (S)", self.save_json_as, MAC_PANEL, MAC_TEXT, "#E8E8ED"),
+                ("导出 XML", self.export_to_xml, MAC_PANEL, MAC_TEXT, "#E8E8ED"),
+                ("导出 Excel", self.export_to_excel, MAC_PANEL, MAC_TEXT, "#E8E8ED"),
+                ("导出 Mermaid", self.export_to_mermaid, MAC_PANEL, MAC_TEXT, "#E8E8ED"),
+                ("复制 Mermaid", self.copy_mermaid, MAC_PANEL, MAC_TEXT, "#E8E8ED"),
+            ],
         ]
-        
-        for text, color, cmd in buttons:
-            tk.Button(button_frame, text=text, bg=color, command=cmd).pack(
-                side=tk.LEFT, padx=2, pady=2
-            )
+        for gi, group in enumerate(groups):
+            if gi:
+                tk.Frame(button_frame, width=1, bg=MAC_LINE).pack(side=tk.LEFT, fill=tk.Y, padx=6, pady=6)
+            for text, cmd, bg, fg, active in group:
+                _btn(text, cmd, bg, fg, active).pack(side=tk.LEFT, padx=3, pady=6)
+
+        _btn("渲染图形 (R)", self.render_img, MAC_GREEN_TINT, "#1E9E4A",
+             "#CDEFDB").pack(side=tk.LEFT, padx=3, pady=6)
     
     def _initialize_tree(self):
         """Initialize the tree with the root node"""
@@ -1396,7 +1554,39 @@ class FTAEditorUI:
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.geometry("750x650")  # Set larger default window size (1.5x wider)
+        dialog.configure(bg=MAC_PANEL)
         result = {}
+        
+        # ---- 对话框内的小工具：统一苹果风格的标签 / 输入框 / 列表 ----
+        def _dlabel(parent, text, **kw):
+            kw.setdefault("bg", MAC_PANEL)
+            kw.setdefault("fg", MAC_TEXT)
+            kw.setdefault("font", (UI_FONT, 10))
+            return tk.Label(parent, text=text, **kw)
+        
+        def _dentry(parent, **kw):
+            kw.setdefault("relief", tk.FLAT)
+            kw.setdefault("bd", 0)
+            kw.setdefault("highlightthickness", 1)
+            kw.setdefault("highlightbackground", MAC_LINE)
+            kw.setdefault("highlightcolor", MAC_BLUE)
+            kw.setdefault("insertbackground", MAC_TEXT)
+            kw.setdefault("font", (UI_FONT, 10))
+            return tk.Entry(parent, **kw)
+        
+        def _dlist(parent, **kw):
+            kw.setdefault("relief", tk.FLAT)
+            kw.setdefault("bd", 0)
+            kw.setdefault("bg", MAC_PANEL)
+            kw.setdefault("fg", MAC_TEXT)
+            kw.setdefault("font", (UI_FONT, 10))
+            kw.setdefault("highlightthickness", 1)
+            kw.setdefault("highlightbackground", MAC_LINE)
+            kw.setdefault("highlightcolor", MAC_BLUE)
+            kw.setdefault("selectbackground", MAC_BLUE)
+            kw.setdefault("selectforeground", "#FFFFFF")
+            kw.setdefault("activestyle", "none")
+            return tk.Listbox(parent, **kw)
         
         # Basic fields
         fields = [
@@ -1406,17 +1596,17 @@ class FTAEditorUI:
         ]
         entries = {}
         for i, (label, widget_type, default) in enumerate(fields):
-            tk.Label(dialog, text=label).grid(row=i, column=0, sticky="w", padx=4, pady=2)
-            entry = widget_type(dialog)
+            _dlabel(dialog, text=label).grid(row=i, column=0, sticky="w", padx=8, pady=3)
+            entry = _dentry(dialog)
             entry.insert(0, default)
             # Make Name field wider
             if label == "名称:":
                 entry.config(width=70)
-            entry.grid(row=i, column=1, padx=4, pady=2, sticky="ew")
+            entry.grid(row=i, column=1, padx=8, pady=3, sticky="ew", ipady=3)
             entries[label] = entry
         
         # Logic Gate
-        tk.Label(dialog, text="逻辑门:").grid(row=3, column=0, sticky="w", padx=4, pady=2)
+        _dlabel(dialog, text="逻辑门:").grid(row=3, column=0, sticky="w", padx=8, pady=3)
         logic_combo = ttk.Combobox(dialog, values=["AND", "OR", "XOR", "NOT", "VOTER"], state="readonly", width=17)
         initial_gate = ((node.get("logicGate", "OR") if node else "OR") or "OR").upper()
         if initial_gate == "VOT":
@@ -1424,18 +1614,18 @@ class FTAEditorUI:
         if initial_gate not in ("AND", "OR", "XOR", "NOT", "VOTER"):
             initial_gate = "OR"
         logic_combo.set(initial_gate)
-        logic_combo.grid(row=3, column=1, padx=4, pady=2)
+        logic_combo.grid(row=3, column=1, padx=8, pady=3, sticky="w")
         
         # Vote threshold row (only visible when VOTER gate is selected)
-        vote_label = tk.Label(dialog, text="表决阈值(k):")
-        vote_entry = tk.Entry(dialog, width=17)
+        vote_label = _dlabel(dialog, text="表决阈值(k):")
+        vote_entry = _dentry(dialog, width=17)
         if node and node.get("voteThreshold") not in (None, ""):
             vote_entry.insert(0, str(node.get("voteThreshold")))
         
         def update_vote_visibility(event=None):
             if (logic_combo.get() or "").upper() in ("VOTER", "VOT"):
-                vote_label.grid(row=4, column=0, sticky="w", padx=4, pady=2)
-                vote_entry.grid(row=4, column=1, padx=4, pady=2, sticky="w")
+                vote_label.grid(row=4, column=0, sticky="w", padx=8, pady=3)
+                vote_entry.grid(row=4, column=1, padx=8, pady=3, sticky="w", ipady=3)
             else:
                 vote_label.grid_remove()
                 vote_entry.grid_remove()
@@ -1444,34 +1634,43 @@ class FTAEditorUI:
         update_vote_visibility()
         
         # Notes
-        tk.Label(dialog, text="备注:").grid(row=5, column=0, sticky="nw", padx=4, pady=2)
-        notes_text = tk.Text(dialog, height=6, width=80)
+        _dlabel(dialog, text="备注:").grid(row=5, column=0, sticky="nw", padx=8, pady=3)
+        notes_text = tk.Text(dialog, height=6, width=80, wrap=tk.WORD, relief=tk.FLAT,
+                             bd=0, bg=MAC_PANEL, fg=MAC_TEXT, font=(UI_FONT, 10),
+                             highlightthickness=1, highlightbackground=MAC_LINE,
+                             highlightcolor=MAC_BLUE, insertbackground=MAC_TEXT)
         if node:
             notes_text.insert("1.0", node.get("notes", ""))
-        notes_text.grid(row=5, column=1, padx=4, pady=2)
+        notes_text.grid(row=5, column=1, padx=8, pady=3, sticky="ew")
         
         # Links UI
-        tk.Label(dialog, text="搜索事件:").grid(row=6, column=0, sticky="w", padx=4, pady=2)
-        search_entry = tk.Entry(dialog, width=75)
-        search_entry.grid(row=6, column=1, padx=4, pady=2, sticky="ew")
+        _dlabel(dialog, text="搜索事件:").grid(row=6, column=0, sticky="w", padx=8, pady=3)
+        search_entry = _dentry(dialog, width=75)
+        search_entry.grid(row=6, column=1, padx=8, pady=3, sticky="ew", ipady=3)
         
-        matches_listbox = tk.Listbox(dialog, height=8, width=80, selectmode=tk.EXTENDED)
-        matches_listbox.grid(row=7, column=0, columnspan=2, padx=4, pady=2, sticky="ew")
+        matches_listbox = _dlist(dialog, height=8, width=80, selectmode=tk.EXTENDED)
+        matches_listbox.grid(row=7, column=0, columnspan=2, padx=8, pady=3, sticky="ew")
         
         # AND/OR links sections
         link_sections = []
         for idx, link_type in enumerate(["AND", "OR"], start=8):
-            tk.Label(dialog, text=f"{link_type} 链接:").grid(
-                row=idx, column=0, sticky="nw", padx=4, pady=2
+            _dlabel(dialog, text=f"{link_type} 链接:").grid(
+                row=idx, column=0, sticky="nw", padx=8, pady=3
             )
-            frame = tk.Frame(dialog)
-            frame.grid(row=idx, column=1, padx=4, pady=2, sticky="w")
-            listbox = tk.Listbox(frame, height=6, width=80)
+            frame = tk.Frame(dialog, bg=MAC_PANEL)
+            frame.grid(row=idx, column=1, padx=8, pady=3, sticky="w")
+            listbox = _dlist(frame, height=6, width=80)
             listbox.grid(row=0, column=0, padx=0, pady=0)
-            btn_frame = tk.Frame(frame)
-            btn_frame.grid(row=0, column=1, padx=4)
-            add_btn = tk.Button(btn_frame, text="添加 →", width=8)
-            remove_btn = tk.Button(btn_frame, text="← 移除", width=8)
+            btn_frame = tk.Frame(frame, bg=MAC_PANEL)
+            btn_frame.grid(row=0, column=1, padx=6)
+            add_btn = tk.Button(btn_frame, text="添加 →", width=8,
+                                bg=MAC_BLUE_TINT, fg=MAC_BLUE,
+                                activebackground=MAC_BLUE_ACTIVE, activeforeground=MAC_BLUE,
+                                relief=tk.FLAT, bd=0, font=(UI_FONT, 9), cursor="hand2")
+            remove_btn = tk.Button(btn_frame, text="← 移除", width=8,
+                                   bg=MAC_RED_TINT, fg=MAC_RED,
+                                   activebackground="#FFD2CE", activeforeground=MAC_RED,
+                                   relief=tk.FLAT, bd=0, font=(UI_FONT, 9), cursor="hand2")
             add_btn.grid(row=0, column=0, pady=2)
             remove_btn.grid(row=1, column=0, pady=2)
             link_sections.append((link_type, listbox, add_btn, remove_btn))
@@ -1581,8 +1780,18 @@ class FTAEditorUI:
                     result["voteThreshold"] = threshold_text
             dialog.destroy()
         
-        tk.Button(dialog, text="确定", command=confirm).grid(row=10, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
-        tk.Button(dialog, text="取消", command=dialog.destroy).grid(row=11, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
+        confirm_btn = tk.Button(dialog, text="确定", command=confirm,
+                                bg=MAC_BLUE, fg="#FFFFFF",
+                                activebackground="#0062CC", activeforeground="#FFFFFF",
+                                relief=tk.FLAT, bd=0, font=(UI_FONT, 10, "bold"),
+                                cursor="hand2")
+        confirm_btn.grid(row=10, column=0, columnspan=2, padx=8, pady=(10, 3), sticky="ew", ipady=4)
+        cancel_btn = tk.Button(dialog, text="取消", command=dialog.destroy,
+                               bg=MAC_BG, fg=MAC_TEXT,
+                               activebackground="#DFDFDF", activeforeground=MAC_TEXT,
+                               relief=tk.FLAT, bd=0, font=(UI_FONT, 10),
+                               cursor="hand2")
+        cancel_btn.grid(row=11, column=0, columnspan=2, padx=8, pady=3, sticky="ew", ipady=4)
         dialog.bind("<Return>", lambda e: None if isinstance(e.widget, tk.Text) else confirm())
         dialog.bind("<Escape>", lambda e: dialog.destroy())
         dialog.wait_window()
@@ -2109,16 +2318,18 @@ class FTAEditorUI:
         """Create a window to view the rendered diagram"""
         win = tk.Toplevel(self.root)
         win.title("FTA 图形")
+        win.configure(bg=MAC_BG)
         
-        frame = tk.Frame(win)
+        frame = tk.Frame(win, bg=MAC_BG)
         frame.pack(fill=tk.BOTH, expand=True)
         
-        h_scroll = tk.Scrollbar(frame, orient=tk.HORIZONTAL)
-        v_scroll = tk.Scrollbar(frame)
+        h_scroll = ttk.Scrollbar(frame, orient=tk.HORIZONTAL)
+        v_scroll = ttk.Scrollbar(frame)
         h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
         v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
-        canvas = tk.Canvas(frame, xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
+        canvas = tk.Canvas(frame, xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set,
+                           bg="#FFFFFF", highlightthickness=0)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         h_scroll.config(command=canvas.xview)
@@ -2175,9 +2386,13 @@ class FTAEditorUI:
                 except Exception as e:
                     messagebox.showerror("保存错误", f"保存图形失败: {e}")
         
-        btn_frame = tk.Frame(win)
+        btn_frame = tk.Frame(win, bg=MAC_BG)
         btn_frame.pack(fill=tk.X)
-        tk.Button(btn_frame, text="另存为 PNG", command=save_diagram).pack(pady=5)
+        tk.Button(btn_frame, text="另存为 PNG", command=save_diagram,
+                  bg=MAC_PANEL, fg=MAC_TEXT, activebackground="#E8E8ED",
+                  activeforeground=MAC_TEXT, relief=tk.FLAT, bd=0,
+                  font=(UI_FONT, 10), padx=14, pady=5,
+                  cursor="hand2").pack(pady=8)
         
         def on_close():
             # Clean up temporary files when window closes
