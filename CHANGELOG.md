@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 概率测试断言由精确相等改为近似比较（`assertAlmostEqual`），消除浮点误差误判
 
 ### Changed
+- **界面全面改版为 macOS 苹果风格**：主窗口与全部对话框（节点编辑、AI 设置、AI 更改建议、图形渲染窗口）统一为白色卡片式面板 + 扁平控件；输入框扁平化并带蓝色聚焦边框，列表选中项蓝色高亮，按钮按功能彩色淡底区分（蓝 = 新建 / 添加 / 编辑，红 = 删除 / 清除，绿 = 渲染 / 应用）并带悬停反馈，状态提示颜色统一（绿 = 成功、红 = 出错、灰 = 等待）
 - API 密钥本地存储增加混淆处理（带 `api_key_enc` 标记）；支持环境变量 `FTA_AI_API_KEY` 提供密钥，优先级高于配置文件
 - AI 输出校验白名单同步纳入 XOR / NOT / VOTER / VOT 门类型
 
