@@ -191,10 +191,21 @@ class FTACore:
                 
                 if gate == "AND":
                     # AND gate: product of children probabilities
-                    base = round(self._product(child_probs), 6)
+                    base = self._product(child_probs)
+                elif gate == "XOR":
+                    # XOR gate: exactly one child occurs
+                    base = self._xor_prob(child_probs)
+                elif gate == "NOT":
+                    # NOT gate: complement of the (first) child probability
+                    base = 1 - child_probs[0] if child_probs else 0.0
+                elif gate in ("VOTER", "VOT"):
+                    # Voting gate: k-out-of-n (k from voteThreshold,
+                    # default = majority)
+                    base = self._voter_prob(child_probs,
+                                            node.get("voteThreshold"))
                 else:
                     # OR gate: union formula (default)
-                    base = round(1 - self._product([1 - p for p in child_probs]), 6)
+                    base = 1 - self._product([1 - p for p in child_probs])
 
             # Process links
             links = node.get("links", []) or []
@@ -214,12 +225,12 @@ class FTACore:
 
             # Apply AND links first
             if and_probs:
-                base = round(base * self._product(and_probs), 6)
+                base = base * self._product(and_probs)
             
             # Apply OR links second
             if or_probs:
                 vals = [base] + or_probs
-                base = round(1 - self._product([1 - p for p in vals]), 6)
+                base = 1 - self._product([1 - p for p in vals])
 
             memo[nid] = base
             visiting.remove(nid)
@@ -242,7 +253,7 @@ class FTACore:
             base_prob = float(node.get("probability", 1.0))
             
             # Child's calculated probability is parent's calc prob * child's base prob
-            calc_prob = round(parent_prob * base_prob, 6)
+            calc_prob = parent_prob * base_prob
             node["calculatedProbability"] = calc_prob
             
             # Recursively calculate for children
@@ -259,6 +270,71 @@ class FTACore:
         for n in nums:
             result *= n
         return result
+
+    @staticmethod
+    def _xor_prob(probs):
+        """XOR gate: probability that exactly one input occurs (independent).
+
+        P = sum_i [ p_i * product_{j != i} (1 - p_j) ], computed directly
+        in O(n^2), which is fine for the small fan-in typical of FTA gates.
+        """
+        total = 0.0
+        n = len(probs)
+        for i in range(n):
+            term = probs[i]
+            for j in range(n):
+                if j != i:
+                    term *= (1 - probs[j])
+            total += term
+        return total
+
+    @staticmethod
+    def _voter_prob(probs, threshold=None):
+        """Voting (k-out-of-n) gate: probability that at least k of n
+        independent inputs occur.
+
+        ``threshold`` comes from the node's ``voteThreshold`` field (accepts
+        an int, a numeric string, or a "k/n" style string); when missing or
+        invalid it defaults to majority voting (n // 2 + 1).
+        Uses an O(n^2) dynamic program over the inputs.
+        """
+        n = len(probs)
+        if n == 0:
+            return 0.0
+        k = FTACore._parse_vote_threshold(threshold, n)
+        # f[j] = probability that exactly j of the processed inputs occur
+        f = [0.0] * (n + 1)
+        f[0] = 1.0
+        for idx, p in enumerate(probs):
+            for j in range(idx + 1, 0, -1):
+                f[j] = f[j] * (1 - p) + f[j - 1] * p
+            f[0] *= (1 - p)
+        return sum(f[k:])
+
+    @staticmethod
+    def _parse_vote_threshold(threshold, n):
+        """Parse a voteThreshold value into an integer k in [1, n].
+
+        Accepts ints, floats, numeric strings and "k/n" style strings.
+        Falls back to majority voting (n // 2 + 1) on any problem.
+        """
+        default_k = n // 2 + 1
+        if threshold is None:
+            return default_k
+        try:
+            if isinstance(threshold, str):
+                text = threshold.strip()
+                if "/" in text:
+                    # accept "k/n" style values, keep the numerator
+                    text = text.split("/", 1)[0]
+                k = int(float(text))
+            else:
+                k = int(threshold)
+        except (TypeError, ValueError):
+            return default_k
+        if k < 1 or k > n:
+            return default_k
+        return k
     
     def get_zero_probability_nodes(self):
         """Return list of node IDs with zero probability"""

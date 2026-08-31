@@ -1032,7 +1032,7 @@ If you have specific suggestions for changes, please format them as structured p
             if prob < 0.0 or prob > 1.0:
                 return False, f"Probability out of range for node {nid}"
             lg = node.get("logicGate", "")
-            if lg not in ["", "AND", "OR", "NOT"]:
+            if lg not in ["", "AND", "OR", "NOT", "XOR", "VOTER", "VOT"]:
                 return False, f"Invalid logicGate for node {nid}: {lg}"
 
             # Children

@@ -41,7 +41,7 @@ class TestProbabilityCalculation(unittest.TestCase):
             "children": [],
             "links": []
         })
-        self.assertEqual(result["calculatedProbability"], 0.5)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.5, delta=1e-9)
 
     def test_and_gate_with_two_children(self):
         """Test AND gate: should calculate product(child_probs)"""
@@ -75,9 +75,9 @@ class TestProbabilityCalculation(unittest.TestCase):
         })
         # AND: product(children) = 0.5 * 0.4 = 0.2
         # Parent's base probability is ignored when children exist
-        self.assertEqual(result["calculatedProbability"], 0.2)
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.5)
-        self.assertEqual(result["children"][1]["calculatedProbability"], 0.4)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.2, delta=1e-9)
+        self.assertAlmostEqual(result["children"][0]["calculatedProbability"], 0.5, delta=1e-9)
+        self.assertAlmostEqual(result["children"][1]["calculatedProbability"], 0.4, delta=1e-9)
 
     def test_or_gate_with_two_children(self):
         """Test OR gate: should use 1 - product(1 - child_prob)"""
@@ -110,7 +110,7 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # OR: 1 - product(1 - child_prob) = 1 - (1-0.5)*(1-0.4) = 1 - 0.5*0.6 = 1 - 0.3 = 0.7
-        self.assertEqual(result["calculatedProbability"], 0.7)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.7, delta=1e-9)
 
     def test_and_gate_with_three_children(self):
         """Test AND gate with three children"""
@@ -152,7 +152,7 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # AND: product(children) = 0.5 * 0.6 * 0.8 = 0.24
-        self.assertEqual(result["calculatedProbability"], 0.24)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.24, delta=1e-9)
 
     def test_or_gate_with_three_children(self):
         """Test OR gate with three children"""
@@ -194,7 +194,7 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # OR: 1 - (1-0.5)*(1-0.6)*(1-0.8) = 1 - 0.5*0.4*0.2 = 1 - 0.04 = 0.96
-        self.assertEqual(result["calculatedProbability"], 0.96)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.96, delta=1e-9)
 
     def test_and_link_simple(self):
         """Test AND link between nodes"""
@@ -232,9 +232,9 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # child2 has no links: 0.6
-        self.assertEqual(result["children"][1]["calculatedProbability"], 0.6)
+        self.assertAlmostEqual(result["children"][1]["calculatedProbability"], 0.6, delta=1e-9)
         # child1 AND-linked to child2: 0.8 * 0.6 = 0.48
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.48)
+        self.assertAlmostEqual(result["children"][0]["calculatedProbability"], 0.48, delta=1e-9)
 
     def test_or_link_simple(self):
         """Test OR link between nodes"""
@@ -272,9 +272,9 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # child2: 0.3
-        self.assertEqual(result["children"][1]["calculatedProbability"], 0.3)
+        self.assertAlmostEqual(result["children"][1]["calculatedProbability"], 0.3, delta=1e-9)
         # child1 OR-linked to child2: 1 - (1-0.5)*(1-0.3) = 1 - 0.5*0.7 = 1 - 0.35 = 0.65
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.65)
+        self.assertAlmostEqual(result["children"][0]["calculatedProbability"], 0.65, delta=1e-9)
 
     def test_mixed_and_or_links(self):
         """Test node with both AND and OR links"""
@@ -325,11 +325,11 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # child2: 0.8, child3: 0.4
-        self.assertEqual(result["children"][1]["calculatedProbability"], 0.8)
-        self.assertEqual(result["children"][2]["calculatedProbability"], 0.4)
+        self.assertAlmostEqual(result["children"][1]["calculatedProbability"], 0.8, delta=1e-9)
+        self.assertAlmostEqual(result["children"][2]["calculatedProbability"], 0.4, delta=1e-9)
         # child1: first apply AND link: 0.5 * 0.8 = 0.4
         # then apply OR link: 1 - (1-0.4)*(1-0.4) = 1 - 0.6*0.6 = 1 - 0.36 = 0.64
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.64)
+        self.assertAlmostEqual(result["children"][0]["calculatedProbability"], 0.64, delta=1e-9)
 
     def test_zero_probability_leaf(self):
         """Test that zero probability propagates correctly"""
@@ -362,7 +362,7 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # AND gate with one zero child: 0.0 * 1.0 = 0.0
-        self.assertEqual(result["calculatedProbability"], 0.0)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.0, delta=1e-9)
 
     def test_nested_and_gates(self):
         """Test nested AND gates"""
@@ -405,12 +405,12 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # grandchild1: 0.5, grandchild2: 0.6
-        self.assertEqual(result["children"][0]["children"][0]["calculatedProbability"], 0.5)
-        self.assertEqual(result["children"][0]["children"][1]["calculatedProbability"], 0.6)
+        self.assertAlmostEqual(result["children"][0]["children"][0]["calculatedProbability"], 0.5, delta=1e-9)
+        self.assertAlmostEqual(result["children"][0]["children"][1]["calculatedProbability"], 0.6, delta=1e-9)
         # child1 (AND gate): product(children) = 0.5 * 0.6 = 0.3
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.3)
+        self.assertAlmostEqual(result["children"][0]["calculatedProbability"], 0.3, delta=1e-9)
         # root (AND gate): product(children) = 0.3
-        self.assertEqual(result["calculatedProbability"], 0.3)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.3, delta=1e-9)
 
     def test_nested_or_gates(self):
         """Test nested OR gates"""
@@ -453,12 +453,12 @@ class TestProbabilityCalculation(unittest.TestCase):
             "links": []
         })
         # grandchild1: 0.5, grandchild2: 0.2
-        self.assertEqual(result["children"][0]["children"][0]["calculatedProbability"], 0.5)
-        self.assertEqual(result["children"][0]["children"][1]["calculatedProbability"], 0.2)
+        self.assertAlmostEqual(result["children"][0]["children"][0]["calculatedProbability"], 0.5, delta=1e-9)
+        self.assertAlmostEqual(result["children"][0]["children"][1]["calculatedProbability"], 0.2, delta=1e-9)
         # child1 (OR gate): 1 - (1-0.5)*(1-0.2) = 1 - 0.5*0.8 = 1 - 0.4 = 0.6
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.6)
+        self.assertAlmostEqual(result["children"][0]["calculatedProbability"], 0.6, delta=1e-9)
         # root (OR gate): 1 - (1-0.6) = 1 - 0.4 = 0.6
-        self.assertEqual(result["calculatedProbability"], 0.6)
+        self.assertAlmostEqual(result["calculatedProbability"], 0.6, delta=1e-9)
 
     def test_circular_reference_protection(self):
         """Test that circular references are handled (uses base probability)"""
@@ -491,6 +491,108 @@ class TestProbabilityCalculation(unittest.TestCase):
         # Should complete without infinite loop
         # When circular reference detected, uses base probability
         self.assertIsNotNone(result["children"][0]["calculatedProbability"])
+
+    def test_xor_gate_two_children(self):
+        """Test XOR gate: exactly one child must occur"""
+        result = self.calc({
+            "id": "root",
+            "name": "Root",
+            "type": "Event",
+            "probability": 1.0,
+            "logicGate": "XOR",
+            "children": [
+                {
+                    "id": "child1",
+                    "name": "Child1",
+                    "type": "Event",
+                    "probability": 0.5,
+                    "logicGate": "OR",
+                    "children": [],
+                    "links": []
+                },
+                {
+                    "id": "child2",
+                    "name": "Child2",
+                    "type": "Event",
+                    "probability": 0.4,
+                    "logicGate": "OR",
+                    "children": [],
+                    "links": []
+                }
+            ],
+            "links": []
+        })
+        # XOR: 0.5*(1-0.4) + 0.4*(1-0.5) = 0.3 + 0.2 = 0.5
+        self.assertAlmostEqual(result["calculatedProbability"], 0.5, delta=1e-9)
+
+    def test_not_gate(self):
+        """Test NOT gate: complement of the child probability"""
+        result = self.calc({
+            "id": "root",
+            "name": "Root",
+            "type": "Event",
+            "probability": 1.0,
+            "logicGate": "NOT",
+            "children": [
+                {
+                    "id": "child1",
+                    "name": "Child1",
+                    "type": "Event",
+                    "probability": 0.3,
+                    "logicGate": "OR",
+                    "children": [],
+                    "links": []
+                }
+            ],
+            "links": []
+        })
+        # NOT: 1 - 0.3 = 0.7
+        self.assertAlmostEqual(result["calculatedProbability"], 0.7, delta=1e-9)
+
+    @staticmethod
+    def _three_children():
+        return [
+            {
+                "id": f"child{i}",
+                "name": f"Child{i}",
+                "type": "Event",
+                "probability": p,
+                "logicGate": "OR",
+                "children": [],
+                "links": []
+            }
+            for i, p in enumerate([0.5, 0.6, 0.8], start=1)
+        ]
+
+    def test_voter_gate_default_majority(self):
+        """Test VOTER gate with default threshold (majority = 2-out-of-3)"""
+        result = self.calc({
+            "id": "root",
+            "name": "Root",
+            "type": "Event",
+            "probability": 1.0,
+            "logicGate": "VOTER",
+            "children": self._three_children(),
+            "links": []
+        })
+        # P(>=2 of 3) = 0.5*0.6*0.2 + 0.5*0.4*0.8 + 0.5*0.6*0.8 + 0.5*0.6*0.8
+        #             = 0.06 + 0.16 + 0.24 + 0.24 = 0.70
+        self.assertAlmostEqual(result["calculatedProbability"], 0.7, delta=1e-9)
+
+    def test_voter_gate_custom_threshold(self):
+        """Test VOTER gate with explicit voteThreshold=3 (all must occur)"""
+        result = self.calc({
+            "id": "root",
+            "name": "Root",
+            "type": "Event",
+            "probability": 1.0,
+            "logicGate": "VOTER",
+            "voteThreshold": 3,
+            "children": self._three_children(),
+            "links": []
+        })
+        # 3-out-of-3: 0.5 * 0.6 * 0.8 = 0.24
+        self.assertAlmostEqual(result["calculatedProbability"], 0.24, delta=1e-9)
 
 
 class TestSampleDataValidation(unittest.TestCase):
@@ -557,7 +659,7 @@ class TestSampleDataValidation(unittest.TestCase):
         node = self.core.find_node_by_id("root_0_0_0")
         # First AND link: 0.5 * 0.8 = 0.4
         # Then OR link: 1 - (1-0.4)*(1-0.0) = 1 - 0.6*1.0 = 0.4
-        self.assertEqual(node["calculatedProbability"], 0.4)
+        self.assertAlmostEqual(node["calculatedProbability"], 0.4, delta=1e-9)
 
     def test_sample_file_matches_stored_results(self):
         """Load the real sampleFTA.json and verify recalculated probabilities
@@ -577,10 +679,11 @@ class TestSampleDataValidation(unittest.TestCase):
             stored = json.load(f)["tree"]
 
         def check(node, stored_node):
-            self.assertEqual(
+            self.assertAlmostEqual(
                 node.get("calculatedProbability"),
                 stored_node.get("calculatedProbability"),
-                f"Mismatch at node {node.get('id')} ({node.get('name')})"
+                delta=1e-6,  # stored values were rounded to 6 decimals
+                msg=f"Mismatch at node {node.get('id')} ({node.get('name')})"
             )
             for child, stored_child in zip(node.get("children", []),
                                            stored_node.get("children", [])):
@@ -590,7 +693,7 @@ class TestSampleDataValidation(unittest.TestCase):
 
         # Spot-check the documented expectation for Ev1.1.1 (root_0_0_0)
         ev111 = self.core.find_node_by_id("root_0_0_0")
-        self.assertEqual(ev111["calculatedProbability"], 0.4)
+        self.assertAlmostEqual(ev111["calculatedProbability"], 0.4, delta=1e-9)
 
 
 def run_tests():
@@ -622,6 +725,9 @@ def run_tests():
         print("\nValidated behaviors (against real src/FTA_Editor_core.py):")
         print("  • AND gate: calculates product of child probabilities")
         print("  • OR gate: uses union formula 1 - product(1 - p for each child)")
+        print("  • XOR gate: exactly one child occurs")
+        print("  • NOT gate: complement of the child probability")
+        print("  • VOTER gate: k-out-of-n (voteThreshold, default majority)")
         print("  • AND links: multiply current probability with linked probabilities")
         print("  • OR links: apply union formula with linked probabilities")
         print("  • Mixed links: AND links applied first, then OR links")

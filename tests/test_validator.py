@@ -104,7 +104,8 @@ class TestUpdatedFTAValidator(unittest.TestCase):
 
     def test_invalid_logic_gate_fails(self):
         data = make_min_valid_tree()
-        data["children"][1]["logicGate"] = "XOR"
+        # XOR is a valid gate now; use a truly unknown gate name
+        data["children"][1]["logicGate"] = "QUANTUM"
         ok, err = self.handler.verify_updated_fta_json(data)
         self.assertFalse(ok)
         self.assertIn("Invalid logicGate", err)

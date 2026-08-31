@@ -1417,28 +1417,50 @@ class FTAEditorUI:
         
         # Logic Gate
         tk.Label(dialog, text="逻辑门:").grid(row=3, column=0, sticky="w", padx=4, pady=2)
-        logic_combo = ttk.Combobox(dialog, values=["AND", "OR"], state="readonly", width=17)
-        logic_combo.set((node.get("logicGate", "OR") if node else "OR").upper())
+        logic_combo = ttk.Combobox(dialog, values=["AND", "OR", "XOR", "NOT", "VOTER"], state="readonly", width=17)
+        initial_gate = ((node.get("logicGate", "OR") if node else "OR") or "OR").upper()
+        if initial_gate == "VOT":
+            initial_gate = "VOTER"
+        if initial_gate not in ("AND", "OR", "XOR", "NOT", "VOTER"):
+            initial_gate = "OR"
+        logic_combo.set(initial_gate)
         logic_combo.grid(row=3, column=1, padx=4, pady=2)
         
+        # Vote threshold row (only visible when VOTER gate is selected)
+        vote_label = tk.Label(dialog, text="表决阈值(k):")
+        vote_entry = tk.Entry(dialog, width=17)
+        if node and node.get("voteThreshold") not in (None, ""):
+            vote_entry.insert(0, str(node.get("voteThreshold")))
+        
+        def update_vote_visibility(event=None):
+            if (logic_combo.get() or "").upper() in ("VOTER", "VOT"):
+                vote_label.grid(row=4, column=0, sticky="w", padx=4, pady=2)
+                vote_entry.grid(row=4, column=1, padx=4, pady=2, sticky="w")
+            else:
+                vote_label.grid_remove()
+                vote_entry.grid_remove()
+        
+        logic_combo.bind("<<ComboboxSelected>>", update_vote_visibility)
+        update_vote_visibility()
+        
         # Notes
-        tk.Label(dialog, text="备注:").grid(row=4, column=0, sticky="nw", padx=4, pady=2)
+        tk.Label(dialog, text="备注:").grid(row=5, column=0, sticky="nw", padx=4, pady=2)
         notes_text = tk.Text(dialog, height=6, width=80)
         if node:
             notes_text.insert("1.0", node.get("notes", ""))
-        notes_text.grid(row=4, column=1, padx=4, pady=2)
+        notes_text.grid(row=5, column=1, padx=4, pady=2)
         
         # Links UI
-        tk.Label(dialog, text="搜索事件:").grid(row=5, column=0, sticky="w", padx=4, pady=2)
+        tk.Label(dialog, text="搜索事件:").grid(row=6, column=0, sticky="w", padx=4, pady=2)
         search_entry = tk.Entry(dialog, width=75)
-        search_entry.grid(row=5, column=1, padx=4, pady=2, sticky="ew")
+        search_entry.grid(row=6, column=1, padx=4, pady=2, sticky="ew")
         
         matches_listbox = tk.Listbox(dialog, height=8, width=80, selectmode=tk.EXTENDED)
-        matches_listbox.grid(row=6, column=0, columnspan=2, padx=4, pady=2, sticky="ew")
+        matches_listbox.grid(row=7, column=0, columnspan=2, padx=4, pady=2, sticky="ew")
         
         # AND/OR links sections
         link_sections = []
-        for idx, link_type in enumerate(["AND", "OR"], start=7):
+        for idx, link_type in enumerate(["AND", "OR"], start=8):
             tk.Label(dialog, text=f"{link_type} 链接:").grid(
                 row=idx, column=0, sticky="nw", padx=4, pady=2
             )
@@ -1538,8 +1560,10 @@ class FTAEditorUI:
                 return
             
             logic_val = (logic_combo.get() or "OR").upper()
-            if logic_val not in ("AND", "OR"):
-                messagebox.showerror("错误", "逻辑门必须是 AND 或 OR。")
+            if logic_val == "VOT":
+                logic_val = "VOTER"
+            if logic_val not in ("AND", "OR", "XOR", "NOT", "VOTER"):
+                messagebox.showerror("错误", "逻辑门必须是 AND、OR、XOR、NOT 或 VOTER。")
                 return
             
             result.update({
@@ -1550,10 +1574,15 @@ class FTAEditorUI:
                 "notes": notes_text.get("1.0", tk.END).strip(),
                 "links": [{"target_id": l["target_id"], "relation": l["relation"]} for l in links_internal]
             })
+            # voteThreshold is only meaningful for VOTER gates; empty = majority
+            if logic_val == "VOTER":
+                threshold_text = vote_entry.get().strip()
+                if threshold_text:
+                    result["voteThreshold"] = threshold_text
             dialog.destroy()
         
-        tk.Button(dialog, text="确定", command=confirm).grid(row=9, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
-        tk.Button(dialog, text="取消", command=dialog.destroy).grid(row=10, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
+        tk.Button(dialog, text="确定", command=confirm).grid(row=10, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
+        tk.Button(dialog, text="取消", command=dialog.destroy).grid(row=11, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
         dialog.bind("<Return>", lambda e: None if isinstance(e.widget, tk.Text) else confirm())
         dialog.bind("<Escape>", lambda e: dialog.destroy())
         dialog.wait_window()
@@ -1598,6 +1627,8 @@ class FTAEditorUI:
                 "links": data.get("links", []),
                 "children": []
             }
+            if data.get("logicGate") == "VOTER" and data.get("voteThreshold"):
+                new_node["voteThreshold"] = data["voteThreshold"]
             if not self.core.add_node_to_data(parent_id, new_node):
                 # Roll back the tree-view insert to keep UI and data consistent
                 self.fta_tree.delete(new_id)
@@ -1630,6 +1661,11 @@ class FTAEditorUI:
                 "notes": data.get("notes", node.get("notes", "")),
                 "links": data.get("links", node.get("links", []))
             })
+            # voteThreshold only applies to VOTER gates; clear stale values
+            if data.get("logicGate") == "VOTER" and data.get("voteThreshold"):
+                node["voteThreshold"] = data["voteThreshold"]
+            else:
+                node.pop("voteThreshold", None)
             self.fta_tree.item(node_id, text=sanitize_name(node.get("name", node_id)))
             self.core.recalculate_probabilities()
             self._apply_zero_marks()
