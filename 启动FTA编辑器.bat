@@ -1,14 +1,64 @@
 @echo off
-chcp 65001 >nul
-title FTA/ETA Editor (ä¸­æ–‡ç‰ˆ)
-rem åˆ‡åˆ°æœ¬è„šæœ¬æ‰€åœ¨ç›®å½•ï¼ˆä¸­æ–‡ç‰ˆç›®å½•ï¼‰
+title FTA/ETA Editor (ÖĞÎÄ°æ)
+rem ÇĞµ½±¾½Å±¾ËùÔÚÄ¿Â¼£¨ÖĞÎÄ°æÄ¿Â¼£©
 cd /d "%~dp0"
-rem ä¼˜å…ˆä½¿ç”¨ PATH ä¸­çš„ pythonï¼Œé¿å…ç¡¬ç¼–ç ç‰¹å®šç‰ˆæœ¬è·¯å¾„
-set "PY=python"
-where python >nul 2>nul
-if errorlevel 1 (
-    echo æœªåœ¨ PATH ä¸­æ‰¾åˆ° pythonï¼Œè¯·å…ˆå®‰è£… Python 3.10 æˆ–æ›´é«˜ç‰ˆæœ¬å¹¶åŠ å…¥ PATHã€‚
+
+rem ============================================================
+rem ×Ô¶¯Ñ¡Ôñ¿ÉÓÃµÄ Python£º±ØĞë´ø tkinter£¨Í¼ĞÎ½çÃæ±ØĞè£©¡£
+rem Ä³Ğ©Èí¼ş×Ô´øµÄ¾«¼ò°æ Python Ã»ÓĞ tkinter£¬»áÆô¶¯¼´±ÀÀ££¬
+rem Òò´ËÃ¿¸öºòÑ¡¶¼ÏÈ×ö tkinter ¼ì²é£¬Í¨¹ı²ÅÊ¹ÓÃ¡£
+rem ============================================================
+set "PYCMD="
+
+rem 1) Python Æô¶¯Æ÷ py£¨×Ô¶¯Ö¸ÏòÏµÍ³°²×°µÄ×îĞÂ¹Ù·½ Python£©
+py -c "import tkinter" >nul 2>nul
+if not errorlevel 1 for /f "delims=" %%E in ('py -c "import sys;print(sys.executable)"') do set "PYCMD=%%E"
+
+rem 2) PATH ÖĞµÄ python£¨ÈôÎªÈ± tkinter µÄ¾«¼ò°æÔò×Ô¶¯Ìø¹ı£©
+if not defined PYCMD (
+    python -c "import tkinter" >nul 2>nul
+    if not errorlevel 1 for /f "delims=" %%E in ('python -c "import sys;print(sys.executable)"') do set "PYCMD=%%E"
+)
+
+rem 3) ³£¼û°²×°Î»ÖÃµÄÏµÍ³ Python£¨3.13 / 3.12 / 3.11 / 3.10£©
+if not defined PYCMD for %%V in (313 312 311 310) do (
+    if not defined PYCMD if exist "%LocalAppData%\Programs\Python\Python%%V%\python.exe" (
+        "%LocalAppData%\Programs\Python\Python%%V%\python.exe" -c "import tkinter" >nul 2>nul
+        if not errorlevel 1 set "PYCMD=%LocalAppData%\Programs\Python\Python%%V%\python.exe"
+    )
+    if not defined PYCMD if exist "%ProgramFiles%\Python%%V%\python.exe" (
+        "%ProgramFiles%\Python%%V%\python.exe" -c "import tkinter" >nul 2>nul
+        if not errorlevel 1 set "PYCMD=%ProgramFiles%\Python%%V%\python.exe"
+    )
+)
+
+if not defined PYCMD (
+    echo [´íÎó] Î´ÕÒµ½´øÍ¼ĞÎ½çÃæ£¨tkinter£©µÄ¿ÉÓÃ Python¡£
+    echo.
+    echo ³£¼ûÔ­Òò£ºPATH ÀïµÄ Python ÊÇÄ³Ğ©Èí¼ş×Ô´øµÄ¾«¼ò°æ£¨È± tkinter£©£¬
+    echo »òÏµÍ³ÉĞÎ´°²×°¹Ù·½°æ Python¡£
+    echo Çë´Ó https://www.python.org/downloads/ °²×° Python 3.10 »ò¸ü¸ß°æ±¾£¬
+    echo °²×°Ê±Îñ±Ø¹´Ñ¡ "Add python.exe to PATH"¡£
+    echo.
     pause
     exit /b 1
 )
-start "" "%PY%" src\FTA_Editor_UI.py
+
+echo ÒÑÑ¡Ôñ Python: %PYCMD%
+
+rem Ê×´ÎÔËĞĞÊ±×Ô¶¯°²×°ÒÀÀµ£¨ÒÑ°²×°ÔòÌø¹ı£¬Ãë¹ı£©
+%PYCMD% -c "import PIL, graphviz, openpyxl, openai" >nul 2>nul
+if errorlevel 1 (
+    echo ¼ì²âµ½È±ÉÙÒÀÀµ£¬ÕıÔÚ×Ô¶¯°²×°£¨requirements.txt£¬½öÊ×´ÎĞèÒª£©...
+    %PYCMD% -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo [´íÎó] ÒÀÀµ°²×°Ê§°Ü£¬Çë¼ì²éÍøÂçºóÖØÊÔ£¬»òÊÖ¶¯Ö´ĞĞ£º
+        echo    %PYCMD% -m pip install -r requirements.txt
+        pause
+        exit /b 1
+    )
+)
+
+rem Æô¶¯Í¼ĞÎ½çÃæ£¨ºÚ´°×îĞ¡»¯±£»î£º³ÌĞòÈôÒâÍâÍË³ö£¬´íÎóĞÅÏ¢»áÏÔÊ¾ÔÚºÚ´°ÖĞ£©
+start "FTA Editor" /min cmd /k ""%PYCMD%" src\FTA_Editor_UI.py & echo. & echo [³ÌĞòÒÑÍË³ö] ÈôÉÏ·½ÓĞ Traceback ¼´Æô¶¯Ê§°ÜÔ­Òò£»Õı³£Ê¹ÓÃÊ±¿ÉÖ±½Ó¹Ø±Õ±¾´°¿Ú & pause"
+exit /b 0
