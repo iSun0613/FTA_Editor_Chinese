@@ -78,16 +78,27 @@ class FTACore:
     # ========== Node Manipulation Methods ==========
     
     def add_node_to_data(self, parent_id, new_node):
-        """Add a new node to the data structure under the specified parent"""
-        self._add_node_to_data_recursive(self.fta_data, parent_id, new_node)
-    
+        """Add a new node to the data structure under the specified parent.
+
+        Returns:
+            bool: True if the parent node was found and the node was added,
+                  False otherwise (e.g., parent_id does not exist).
+        """
+        return self._add_node_to_data_recursive(self.fta_data, parent_id, new_node)
+
     def _add_node_to_data_recursive(self, current_node, parent_id, new_node):
-        """Recursively add node to data structure"""
+        """Recursively add node to data structure.
+
+        Returns:
+            bool: True if the node was added under this subtree, False otherwise.
+        """
         if current_node["id"] == parent_id:
             current_node.setdefault("children", []).append(new_node)
-        else:
-            for child in current_node.get("children", []):
-                self._add_node_to_data_recursive(child, parent_id, new_node)
+            return True
+        for child in current_node.get("children", []):
+            if self._add_node_to_data_recursive(child, parent_id, new_node):
+                return True
+        return False
     
     def update_node(self, node_id, updates):
         """Update a node with new data"""
@@ -290,11 +301,9 @@ class FTACore:
             try:
                 with open(file_path, 'r', encoding=enc) as f:
                     content = f.read().strip()
-                    # Handle double-wrapped JSON
-                    if content.startswith("{{"):
-                        content = "{" + content[2:]
-                    if content.endswith("}}"):
-                        content = content[:-1]
+                    # Handle double-wrapped JSON (only when both markers present)
+                    if content.startswith("{{") and content.endswith("}}"):
+                        content = "{" + content[2:-1]
                     loaded_data = json.loads(content)
                 break
             except (UnicodeDecodeError, json.JSONDecodeError):

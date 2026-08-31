@@ -212,12 +212,27 @@ class TestProbabilityCalculationWithCore(unittest.TestCase):
             "children": [],
             "links": []
         }
-        self.core.add_node_to_data("root", new_node)
-        
+        result = self.core.add_node_to_data("root", new_node)
+        self.assertTrue(result, "add_node_to_data should return True for an existing parent")
+
         # Verify it was added
         found = self.core.find_node_by_id("root_0")
         self.assertIsNotNone(found)
         self.assertEqual(found["name"], "NewChild")
+
+        # Adding under a non-existent parent must fail and return False
+        orphan_node = {
+            "id": "orphan_1",
+            "name": "Orphan",
+            "type": "Event",
+            "probability": 0.5,
+            "logicGate": "OR",
+            "children": [],
+            "links": []
+        }
+        result = self.core.add_node_to_data("no_such_parent", orphan_node)
+        self.assertFalse(result, "add_node_to_data should return False for a missing parent")
+        self.assertIsNone(self.core.find_node_by_id("orphan_1"))
         
         # Update the node
         self.core.update_node("root_0", {"name": "UpdatedChild", "probability": 0.9})

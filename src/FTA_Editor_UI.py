@@ -46,6 +46,11 @@ class FTAEditorUI:
         self.ai_agent = AIAgentHandler()
         self.ai_processing = False  # Track if AI is processing
         
+        # Async render state (preview/diagram rendering runs in background threads)
+        self._preview_rendering = False  # A preview render subprocess is running
+        self._preview_pending = None     # Latest coalesced preview request
+        self._render_in_progress = False # Manual "渲染图形" render is running
+        
         # UI state
         self.preview_image = None
         self.preview_img_id = None
@@ -64,6 +69,9 @@ class FTAEditorUI:
         
         # Initial preview update
         self.update_preview()
+        
+        # Confirm before closing main window
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
     
     def _build_ui(self):
         """Build the main UI layout"""
@@ -434,19 +442,35 @@ class FTAEditorUI:
                 return
             
             status_label.config(text="正在获取可用模型...", fg="blue")
-            dialog.update()
-            
             endpoint = endpoint_entry.get().strip()
-            available_models, fetch_error = provider.get_available_models(api_key, endpoint)
             
-            if fetch_error:
-                status_label.config(text=f"注意: {fetch_error}", fg="orange")
-            else:
-                status_label.config(text="模型加载成功", fg="green")
+            def _fetch_worker():
+                try:
+                    result = provider.get_available_models(api_key, endpoint)
+                except Exception as e:
+                    result = (provider.get_default_models(), str(e))
+                try:
+                    self.root.after(0, lambda: _fetch_done(result))
+                except Exception:
+                    pass  # 主窗口已销毁
             
-            model_combo['values'] = available_models
-            if available_models:
-                model_combo.set(available_models[0])
+            def _fetch_done(result):
+                try:
+                    if not dialog.winfo_exists():
+                        return
+                except tk.TclError:
+                    return
+                available_models, fetch_error = result
+                if fetch_error:
+                    status_label.config(text=f"注意: {fetch_error}", fg="orange")
+                else:
+                    status_label.config(text="模型加载成功", fg="green")
+                
+                model_combo['values'] = available_models
+                if available_models:
+                    model_combo.set(available_models[0])
+            
+            threading.Thread(target=_fetch_worker, daemon=True).start()
         
         refresh_btn = tk.Button(model_frame, text="↻", command=refresh_models, width=3)
         refresh_btn.pack(side="right", padx=(5, 0))
@@ -464,21 +488,37 @@ class FTAEditorUI:
                 api_key = api_key_entry.get().strip()
                 endpoint = provider.get_default_endpoint()
                 
-                # Try to fetch available models dynamically
+                # Try to fetch available models dynamically (async to avoid freezing the dialog)
                 if api_key:
                     status_label.config(text="正在获取可用模型...", fg="blue")
-                    dialog.update()
                     
-                    available_models, fetch_error = provider.get_available_models(api_key, endpoint)
+                    def _provider_fetch_worker(provider=provider, api_key=api_key, endpoint=endpoint):
+                        try:
+                            result = provider.get_available_models(api_key, endpoint)
+                        except Exception as e:
+                            result = (provider.get_default_models(), str(e))
+                        try:
+                            self.root.after(0, lambda: _provider_fetch_done(result))
+                        except Exception:
+                            pass  # 主窗口已销毁
                     
-                    if fetch_error:
-                        status_label.config(text=f"使用默认模型: {fetch_error}", fg="orange")
-                    else:
-                        status_label.config(text="", fg="black")
+                    def _provider_fetch_done(result):
+                        try:
+                            if not dialog.winfo_exists():
+                                return
+                        except tk.TclError:
+                            return
+                        available_models, fetch_error = result
+                        if fetch_error:
+                            status_label.config(text=f"使用默认模型: {fetch_error}", fg="orange")
+                        else:
+                            status_label.config(text="", fg="black")
+                        
+                        model_combo['values'] = available_models
+                        if available_models:
+                            model_combo.set(available_models[0])
                     
-                    model_combo['values'] = available_models
-                    if available_models:
-                        model_combo.set(available_models[0])
+                    threading.Thread(target=_provider_fetch_worker, daemon=True).start()
                 else:
                     # No API key yet, use defaults
                     model_options = provider.get_default_models()
@@ -518,22 +558,38 @@ class FTAEditorUI:
                 return
             
             status_label.config(text="正在测试连接...", fg="blue")
-            dialog.update()
             
-            success, message = test_connection(api_key, endpoint, model, provider_name)
+            def _test_worker():
+                try:
+                    result = test_connection(api_key, endpoint, model, provider_name)
+                except Exception as e:
+                    result = (False, str(e))
+                try:
+                    self.root.after(0, lambda: _test_done(result))
+                except Exception:
+                    pass  # 主窗口已销毁
             
-            if success:
-                # Save credentials
-                save_success, save_error = self.ai_agent.configure(api_key, endpoint, model, provider_name)
-                if save_success:
-                    status_label.config(text="✓ 配置保存成功！", fg="green")
-                    self._update_ai_status()
-                    self._add_chat_message("system", f"✓ {provider_name} AI 配置成功！你现在可以询问关于故障树的问题。")
-                    dialog.after(1500, dialog.destroy)
+            def _test_done(result):
+                try:
+                    if not dialog.winfo_exists():
+                        return
+                except tk.TclError:
+                    return
+                success, message = result
+                if success:
+                    # Save credentials
+                    save_success, save_error = self.ai_agent.configure(api_key, endpoint, model, provider_name)
+                    if save_success:
+                        status_label.config(text="✓ 配置保存成功！", fg="green")
+                        self._update_ai_status()
+                        self._add_chat_message("system", f"✓ {provider_name} AI 配置成功！你现在可以询问关于故障树的问题。")
+                        dialog.after(1500, dialog.destroy)
+                    else:
+                        status_label.config(text=f"保存失败: {save_error}", fg="red")
                 else:
-                    status_label.config(text=f"保存失败: {save_error}", fg="red")
-            else:
-                status_label.config(text=f"✗ {message}", fg="red")
+                    status_label.config(text=f"✗ {message}", fg="red")
+            
+            threading.Thread(target=_test_worker, daemon=True).start()
         
         def clear_credentials():
             success, error = cred_manager.delete_credentials()
@@ -782,8 +838,10 @@ class FTAEditorUI:
                     "children": []
                 }
                 
-                self.core.add_node_to_data(parent_id, new_node)
-                
+                if not self.core.add_node_to_data(parent_id, new_node):
+                    self._add_chat_message("error", f"数据中未找到父节点 '{parent_id}'；跳过添加。")
+                    return False
+
                 depth = self._get_depth(parent_id)
                 tag = f"level{depth+1}"  # Support arbitrary depths
                 self.fta_tree.insert(parent_id, 'end', iid=new_id, 
@@ -1104,6 +1162,11 @@ class FTAEditorUI:
                 return False
         return False
     
+    def _on_closing(self):
+        """Handle main window close request with unsaved changes confirmation"""
+        if self._check_unsaved_changes():
+            self.root.destroy()
+    
     def new_analysis(self):
         """Create a new FTA analysis"""
         if not self._check_unsaved_changes():
@@ -1177,80 +1240,123 @@ class FTAEditorUI:
         self.preview_canvas.config(cursor="")
     
     def update_preview(self):
-        """Update the live diagram preview panel"""
+        """Update the live diagram preview panel (async: rendering runs in a background thread)"""
         viewer_path = Path(__file__).parent / "json_viewer.py"
         if not viewer_path.exists():
             self._show_preview_error("未找到 json_viewer.py")
             return
         
-        tmp_json = tmp_png = None
+        # 快照必须在主线程完成：tk Variable 与 core 数据都不是线程安全的
         try:
-            tmp_json_f = tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".json", encoding="utf-8"
-            )
-            tmp_json = Path(tmp_json_f.name)
             export_data = self.core.prepare_export_data()
-            json.dump(export_data, tmp_json_f, indent=2, ensure_ascii=False)
-            tmp_json_f.close()
-            
-            tmp_png_f = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            tmp_png = Path(tmp_png_f.name)
-            tmp_png_f.close()
-            
-            cmd = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_png)]
-            if self.gate_shape_var.get():
-                cmd.append("--gate-shape")
-            if self.hide_zero_var.get():
-                cmd.append("--hide-zero")
-            if not self.show_probability_var.get():
-                cmd.append("--no-probability")
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            # 仅当渲染器确实产出了有效 PNG 才去打开，避免空文件导致“cannot identify image file”
-            png_ok = (proc.returncode == 0 and tmp_png.exists()
-                      and tmp_png.stat().st_size > 0)
-            if png_ok:
-                try:
-                    from PIL import Image, ImageTk
-                    pil_img = Image.open(str(tmp_png))
-                    self.preview_original_img = pil_img.copy()
-                    
-                    # Reset scale on update
-                    self.preview_scale = 1.0
-                    
-                    self.preview_image = ImageTk.PhotoImage(pil_img)
-                    
-                    if self.preview_img_id:
-                        self.preview_canvas.itemconfig(self.preview_img_id, image=self.preview_image)
-                    else:
-                        self.preview_img_id = self.preview_canvas.create_image(
-                            0, 0, image=self.preview_image, anchor=tk.NW
-                        )
-                    
-                    self.preview_canvas.config(scrollregion=self.preview_canvas.bbox(tk.ALL))
-                    # Clear any previous error messages
-                    self._clear_preview_error()
-                except Exception as e:
-                    self._show_preview_error(f"图像加载失败: {e}")
-            elif proc.stderr:
-                error_msg = f"渲染器失败（退出码 {proc.returncode}）"
-                error_msg += f"\n标准错误: {proc.stderr.strip()}"
-                if proc.stdout:
-                    error_msg += f"\n标准输出: {proc.stdout.strip()}"
-                self._show_preview_error(error_msg)
-            else:
-                # 空树等场景渲染器不产出有效图片，给中性提示而非报错
-                self._show_preview_error("暂无内容可预览，请在画布中添加节点后刷新")
         except Exception as e:
-            import traceback
-            self._show_preview_error(f"预览更新失败: {e}\n回溯信息: {traceback.format_exc()}")
-        finally:
-            for path in [tmp_json, tmp_png]:
-                try:
-                    if path and path.exists():
-                        path.unlink()
-                except Exception:
-                    pass
+            self._show_preview_error(f"预览数据准备失败: {e}")
+            return
+        flags = []
+        if self.gate_shape_var.get():
+            flags.append("--gate-shape")
+        if self.hide_zero_var.get():
+            flags.append("--hide-zero")
+        if not self.show_probability_var.get():
+            flags.append("--no-probability")
+        
+        # 渲染进行中时仅保留最新请求，完成后会再补渲染一次（合并连续更新）
+        self._preview_pending = (str(viewer_path), export_data, flags)
+        if self._preview_rendering:
+            return
+        self._preview_rendering = True
+        self._start_preview_render()
+    
+    def _start_preview_render(self):
+        """Run the pending preview render in a background thread"""
+        viewer_path, export_data, flags = self._preview_pending
+        self._preview_pending = None
+        
+        def work():
+            tmp_json = tmp_png = None
+            png_bytes = None
+            error_msg = None
+            try:
+                tmp_json_f = tempfile.NamedTemporaryFile(
+                    mode="w", delete=False, suffix=".json", encoding="utf-8"
+                )
+                tmp_json = Path(tmp_json_f.name)
+                json.dump(export_data, tmp_json_f, indent=2, ensure_ascii=False)
+                tmp_json_f.close()
+                
+                tmp_png_f = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                tmp_png = Path(tmp_png_f.name)
+                tmp_png_f.close()
+                
+                cmd = [sys.executable, viewer_path, "-i", str(tmp_json), "-o", str(tmp_png)]
+                cmd.extend(flags)
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                
+                # 仅当渲染器确实产出了有效 PNG 才回传字节，避免空文件导致“cannot identify image file”
+                if proc.returncode == 0 and tmp_png.exists() and tmp_png.stat().st_size > 0:
+                    png_bytes = tmp_png.read_bytes()
+                elif proc.stderr:
+                    error_msg = f"渲染器失败（退出码 {proc.returncode}）"
+                    error_msg += f"\n标准错误: {proc.stderr.strip()}"
+                    if proc.stdout:
+                        error_msg += f"\n标准输出: {proc.stdout.strip()}"
+                # 否则：空树等场景渲染器不产出有效图片，error_msg 保持 None，主线程给中性提示
+            except Exception as e:
+                import traceback
+                error_msg = f"预览更新失败: {e}\n回溯信息: {traceback.format_exc()}"
+            finally:
+                for path in [tmp_json, tmp_png]:
+                    try:
+                        if path and path.exists():
+                            path.unlink()
+                    except Exception:
+                        pass
+            try:
+                self.root.after(0, lambda: self._finish_preview_render(png_bytes, error_msg))
+            except Exception:
+                pass  # 主窗口已销毁（程序退出中），丢弃结果
+        
+        thread = threading.Thread(target=work)
+        thread.daemon = True
+        thread.start()
+    
+    def _finish_preview_render(self, png_bytes, error_msg):
+        """Apply background preview render result on the main thread"""
+        self._preview_rendering = False
+        if png_bytes is not None:
+            try:
+                import io
+                from PIL import Image, ImageTk
+                pil_img = Image.open(io.BytesIO(png_bytes))
+                self.preview_original_img = pil_img.copy()
+                
+                # Reset scale on update
+                self.preview_scale = 1.0
+                
+                self.preview_image = ImageTk.PhotoImage(pil_img)
+                
+                if self.preview_img_id:
+                    self.preview_canvas.itemconfig(self.preview_img_id, image=self.preview_image)
+                else:
+                    self.preview_img_id = self.preview_canvas.create_image(
+                        0, 0, image=self.preview_image, anchor=tk.NW
+                    )
+                
+                self.preview_canvas.config(scrollregion=self.preview_canvas.bbox(tk.ALL))
+                # Clear any previous error messages
+                self._clear_preview_error()
+            except Exception as e:
+                self._show_preview_error(f"图像加载失败: {e}")
+        elif error_msg:
+            self._show_preview_error(error_msg)
+        else:
+            # 空树等场景渲染器不产出有效图片，给中性提示而非报错
+            self._show_preview_error("暂无内容可预览，请在画布中添加节点后刷新")
+        
+        # 渲染期间若又有新的预览请求，立即补渲染一次，保证最终显示最新状态
+        if self._preview_pending is not None:
+            self._preview_rendering = True
+            self._start_preview_render()
 
     def _show_preview_error(self, error_msg):
         """Show error message in preview canvas"""
@@ -1448,7 +1554,7 @@ class FTAEditorUI:
         
         tk.Button(dialog, text="确定", command=confirm).grid(row=9, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
         tk.Button(dialog, text="取消", command=dialog.destroy).grid(row=10, column=0, columnspan=2, padx=4, pady=6, sticky="ew")
-        dialog.bind("<Return>", lambda e: confirm())
+        dialog.bind("<Return>", lambda e: None if isinstance(e.widget, tk.Text) else confirm())
         dialog.bind("<Escape>", lambda e: dialog.destroy())
         dialog.wait_window()
         return result if result else None
@@ -1492,7 +1598,11 @@ class FTAEditorUI:
                 "links": data.get("links", []),
                 "children": []
             }
-            self.core.add_node_to_data(parent_id, new_node)
+            if not self.core.add_node_to_data(parent_id, new_node):
+                # Roll back the tree-view insert to keep UI and data consistent
+                self.fta_tree.delete(new_id)
+                messagebox.showerror("添加错误", f"在已加载的数据中未找到父节点 '{parent_id}'。")
+                return
             self.core.recalculate_probabilities()
             self._apply_zero_marks()
             self.update_preview()
@@ -1669,8 +1779,13 @@ class FTAEditorUI:
         """Get the depth of a node in the tree"""
         depth = 0
         while node_id != 'root':
-            node_id = self.fta_tree.parent(node_id)
+            parent_id = self.fta_tree.parent(node_id)
+            if not parent_id or parent_id == node_id:
+                break
+            node_id = parent_id
             depth += 1
+            if depth >= 1000:
+                break
         return depth
     
     def _get_parent_probability(self, parent_id: str) -> float:
@@ -1813,84 +1928,119 @@ class FTAEditorUI:
             messagebox.showerror("复制失败", f"复制到剪贴板失败:\n{exc}")
     
     def render_img(self):
-        """Render and display the FTA diagram in a new window, and update live preview with HQ"""
+        """Render and display the FTA diagram in a new window, and update live preview with HQ (async)"""
         viewer_path = Path(__file__).parent / "json_viewer.py"
         if not viewer_path.exists():
             messagebox.showerror("渲染错误", f"未找到 json_viewer.py:\n{viewer_path}")
             return
         
-        tmp_json = tmp_png = tmp_preview_png = None
+        if self._render_in_progress:
+            messagebox.showinfo("渲染", "正在渲染中，请稍候…")
+            return
+        self._render_in_progress = True
+        
+        # 快照必须在主线程完成：tk Variable 与 core 数据都不是线程安全的
         try:
-            tmp_json_f = tempfile.NamedTemporaryFile(
-                mode="w", delete=False, suffix=".json", encoding="utf-8"
-            )
-            tmp_json = Path(tmp_json_f.name)
-            json.dump(self.core.prepare_export_data(), tmp_json_f, indent=2, ensure_ascii=False)
-            tmp_json_f.close()
-            
-            tmp_png_f = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            tmp_png = Path(tmp_png_f.name)
-            tmp_png_f.close()
-            
-            tmp_preview_png_f = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            tmp_preview_png = Path(tmp_preview_png_f.name)
-            tmp_preview_png_f.close()
-            
-            # 渲染选项：是否显示概率文字 / 事件之间门符号
-            def _render_flags():
-                flags = []
-                if self.hide_zero_var.get():
-                    flags.append("--hide-zero")
-                if self.gate_shape_var.get():
-                    flags.append("--gate-shape")
-                if not self.show_probability_var.get():
-                    flags.append("--no-probability")
-                return flags
-
-            # Render high-quality image for display window
-            cmd = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_png)]
-            cmd.extend(_render_flags())
-            cmd.append("--high-quality")
-            proc = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if proc.returncode != 0 or not tmp_png.exists():
-                raise RuntimeError(
-                    f"渲染器失败（退出码 {proc.returncode}）。\n{proc.stdout}\n{proc.stderr}"
+            export_data = self.core.prepare_export_data()
+        except Exception as e:
+            self._render_in_progress = False
+            messagebox.showerror("渲染错误", f"{e}")
+            return
+        
+        # 渲染选项：是否显示概率文字 / 事件之间门符号
+        flags = []
+        if self.hide_zero_var.get():
+            flags.append("--hide-zero")
+        if self.gate_shape_var.get():
+            flags.append("--gate-shape")
+        if not self.show_probability_var.get():
+            flags.append("--no-probability")
+        
+        viewer_path_str = str(viewer_path)
+        
+        def work():
+            tmp_json = tmp_png = tmp_preview_png = None
+            error_msg = None
+            try:
+                tmp_json_f = tempfile.NamedTemporaryFile(
+                    mode="w", delete=False, suffix=".json", encoding="utf-8"
                 )
-            # 渲染成功但未产出有效 PNG（如当前树为空）时给出明确提示，而非报“cannot identify image file”
-            if tmp_png.stat().st_size == 0:
-                detail = (proc.stderr or "").strip()
-                raise RuntimeError(
-                    "当前树无可渲染内容，请先在画布中添加节点。\n" + detail
-                )
-            
-            # Also update live preview with high-quality image
-            cmd_preview = [sys.executable, str(viewer_path), "-i", str(tmp_json), "-o", str(tmp_preview_png)]
-            cmd_preview.extend(_render_flags())
-            cmd_preview.append("--high-quality")
-            proc_preview = subprocess.run(cmd_preview, capture_output=True, text=True)
-            
-            if proc_preview.returncode == 0 and tmp_preview_png.exists():
+                tmp_json = Path(tmp_json_f.name)
+                json.dump(export_data, tmp_json_f, indent=2, ensure_ascii=False)
+                tmp_json_f.close()
+                
+                tmp_png_f = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                tmp_png = Path(tmp_png_f.name)
+                tmp_png_f.close()
+                
+                tmp_preview_png_f = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                tmp_preview_png = Path(tmp_preview_png_f.name)
+                tmp_preview_png_f.close()
+                
+                # Render high-quality image for display window
+                cmd = [sys.executable, viewer_path_str, "-i", str(tmp_json), "-o", str(tmp_png)]
+                cmd.extend(flags)
+                cmd.append("--high-quality")
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if proc.returncode != 0 or not tmp_png.exists():
+                    raise RuntimeError(
+                        f"渲染器失败（退出码 {proc.returncode}）。\n{proc.stdout}\n{proc.stderr}"
+                    )
+                # 渲染成功但未产出有效 PNG（如当前树为空）时给出明确提示，而非报“cannot identify image file”
+                if tmp_png.stat().st_size == 0:
+                    detail = (proc.stderr or "").strip()
+                    raise RuntimeError(
+                        "当前树无可渲染内容，请先在画布中添加节点。\n" + detail
+                    )
+                
+                # Also render for live preview with high-quality image
+                cmd_preview = [sys.executable, viewer_path_str, "-i", str(tmp_json), "-o", str(tmp_preview_png)]
+                cmd_preview.extend(flags)
+                cmd_preview.append("--high-quality")
+                proc_preview = subprocess.run(cmd_preview, capture_output=True, text=True)
+                if proc_preview.returncode != 0 or not tmp_preview_png.exists() \
+                        or tmp_preview_png.stat().st_size == 0:
+                    tmp_preview_png = None  # 预览渲染失败不阻断主图弹窗
+            except Exception as e:
+                error_msg = str(e)
+                # Clean up on error
+                for path in [tmp_json, tmp_png, tmp_preview_png]:
+                    try:
+                        if path and path.exists():
+                            path.unlink()
+                    except Exception:
+                        pass
+                tmp_json = tmp_png = tmp_preview_png = None
+            try:
+                self.root.after(0, lambda: self._finish_render_img(
+                    tmp_png, tmp_json, tmp_preview_png, error_msg))
+            except Exception:
+                pass  # 主窗口已销毁（程序退出中），丢弃结果
+        
+        thread = threading.Thread(target=work)
+        thread.daemon = True
+        thread.start()
+    
+    def _finish_render_img(self, tmp_png, tmp_json, tmp_preview_png, error_msg):
+        """Handle background render completion on the main thread"""
+        self._render_in_progress = False
+        if error_msg is not None:
+            messagebox.showerror("渲染错误", error_msg)
+            return
+        try:
+            # Update live preview with the high-quality image
+            if tmp_preview_png and tmp_preview_png.exists():
                 self._update_preview_with_image(tmp_preview_png)
-            
             # Create viewer window - passes ownership of tmp files to the window
             self._create_diagram_viewer_window(tmp_png, tmp_json)
+        finally:
             # Note: tmp_preview_png is no longer needed after preview update
             try:
                 if tmp_preview_png and tmp_preview_png.exists():
                     tmp_preview_png.unlink()
             except Exception:
                 pass
-            
-        except Exception as e:
-            messagebox.showerror("渲染错误", f"{e}")
-            # Clean up on error
-            for path in [tmp_json, tmp_png, tmp_preview_png]:
-                try:
-                    if path and path.exists():
-                        path.unlink()
-                except Exception:
-                    pass
     
     def _update_preview_with_image(self, image_path):
         """Update the live preview with a specific image file"""

@@ -214,7 +214,7 @@ class GeminiProvider(AIProvider):
                     model_name = model.name.replace("models/", "")
                     available.append(model_name)
             
-            return sorted(available) if available else self.get_default_models(), None
+            return (sorted(available) if available else self.get_default_models()), None
         except ImportError:
             return self.get_default_models(), "Google Generative AI package not installed"
         except Exception as e:

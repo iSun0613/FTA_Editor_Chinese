@@ -1,112 +1,38 @@
 """
 Test suite for FTA Editor probability calculation validation
-Tests AND/OR gate logic and link handling
+Tests AND/OR gate logic and link handling against the REAL core implementation
+(src/FTA_Editor_core.py -> FTACore.recalculate_probabilities).
+
+Note: this file previously defined a mock ProbabilityCalculator that only
+verified a copy of the formula, so changes to the real core code could not
+break these tests. It now imports and exercises the real FTACore instead.
 """
 import unittest
 import sys
 from pathlib import Path
 
-# Add parent directory to path to import FTA_Editor
-sys.path.insert(0, str(Path(__file__).parent))
+# Add project root to path so we can import the real core module
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import just the calculation logic by creating a minimal mock
-class ProbabilityCalculator:
-    """Extracted probability calculation logic for testing"""
-    
-    def __init__(self):
-        self.fta_data = None
-    
-    def _product(self, nums):
-        """Calculate product of numbers"""
-        result = 1
-        for n in nums:
-            result *= n
-        return result
-    
-    def _find_node_by_id(self, current_node, node_id):
-        """Find a node by ID in the tree"""
-        if str(current_node.get("id")) == str(node_id):
-            return current_node
-        for child in current_node.get("children", []):
-            result = self._find_node_by_id(child, node_id)
-            if result:
-                return result
-        return None
-    
-    def recalculate_probabilities(self, data):
-        """Calculate probabilities for all nodes in the tree"""
-        self.fta_data = data
-        memo = {}
-        visiting = set()
-
-        def get_prob(node):
-            nid = node.get("id")
-            if nid in memo:
-                return memo[nid]
-            if nid in visiting:
-                val = float(node.get("probability", 1.0))
-                memo[nid] = val
-                return val
-
-            visiting.add(nid)
-            children = node.get("children", []) or []
-            
-            if not children:
-                base = float(node.get("probability", 0.0))
-            else:
-                child_probs = [get_prob(c) for c in children]
-                gate = (node.get("logicGate") or "OR").upper()
-                
-                if gate == "AND":
-                    # AND gate: product of children probabilities
-                    base = round(self._product(child_probs), 6)
-                else:
-                    # OR gate: union formula
-                    base = round(1 - self._product([1 - p for p in child_probs]), 6)
-
-            # Process links
-            links = node.get("links", []) or []
-            and_probs = []
-            or_probs = []
-            
-            for l in links:
-                tid = l.get("target_id")
-                rel = (l.get("relation") or "OR").upper()
-                if not tid:
-                    continue
-                target = self._find_node_by_id(self.fta_data, tid)
-                if not target:
-                    continue
-                tp = get_prob(target)
-                (and_probs if rel == "AND" else or_probs).append(tp)
-
-            if and_probs:
-                base = round(base * self._product(and_probs), 6)
-            if or_probs:
-                vals = [base] + or_probs
-                base = round(1 - self._product([1 - p for p in vals]), 6)
-
-            memo[nid] = base
-            visiting.remove(nid)
-            node["calculatedProbability"] = base
-            return base
-
-        if isinstance(data, dict):
-            get_prob(data)
-        
-        return data
+from src.FTA_Editor_core import FTACore
 
 
 class TestProbabilityCalculation(unittest.TestCase):
-    """Test cases for probability calculation logic"""
-    
+    """Test cases for probability calculation logic (real FTACore)"""
+
     def setUp(self):
         """Set up test fixtures"""
-        self.calc = ProbabilityCalculator()
-    
+        self.core = FTACore()
+
+    def calc(self, data):
+        """Run the real core probability calculation and return the data"""
+        self.core.set_data(data)
+        self.core.recalculate_probabilities()
+        return self.core.get_data()
+
     def test_leaf_node_probability(self):
         """Test that leaf nodes use their base probability"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -114,13 +40,12 @@ class TestProbabilityCalculation(unittest.TestCase):
             "logicGate": "OR",
             "children": [],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         self.assertEqual(result["calculatedProbability"], 0.5)
-    
+
     def test_and_gate_with_two_children(self):
         """Test AND gate: should calculate product(child_probs)"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -147,17 +72,16 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # AND: product(children) = 0.5 * 0.4 = 0.2
         # Parent's base probability is ignored when children exist
         self.assertEqual(result["calculatedProbability"], 0.2)
         self.assertEqual(result["children"][0]["calculatedProbability"], 0.5)
         self.assertEqual(result["children"][1]["calculatedProbability"], 0.4)
-    
+
     def test_or_gate_with_two_children(self):
         """Test OR gate: should use 1 - product(1 - child_prob)"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -184,14 +108,13 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # OR: 1 - product(1 - child_prob) = 1 - (1-0.5)*(1-0.4) = 1 - 0.5*0.6 = 1 - 0.3 = 0.7
         self.assertEqual(result["calculatedProbability"], 0.7)
-    
+
     def test_and_gate_with_three_children(self):
         """Test AND gate with three children"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -227,14 +150,13 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # AND: product(children) = 0.5 * 0.6 * 0.8 = 0.24
         self.assertEqual(result["calculatedProbability"], 0.24)
-    
+
     def test_or_gate_with_three_children(self):
         """Test OR gate with three children"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -270,14 +192,13 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # OR: 1 - (1-0.5)*(1-0.6)*(1-0.8) = 1 - 0.5*0.4*0.2 = 1 - 0.04 = 0.96
         self.assertEqual(result["calculatedProbability"], 0.96)
-    
+
     def test_and_link_simple(self):
         """Test AND link between nodes"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -309,16 +230,15 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # child2 has no links: 0.6
         self.assertEqual(result["children"][1]["calculatedProbability"], 0.6)
         # child1 AND-linked to child2: 0.8 * 0.6 = 0.48
         self.assertEqual(result["children"][0]["calculatedProbability"], 0.48)
-    
+
     def test_or_link_simple(self):
         """Test OR link between nodes"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -350,16 +270,15 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # child2: 0.3
         self.assertEqual(result["children"][1]["calculatedProbability"], 0.3)
         # child1 OR-linked to child2: 1 - (1-0.5)*(1-0.3) = 1 - 0.5*0.7 = 1 - 0.35 = 0.65
         self.assertEqual(result["children"][0]["calculatedProbability"], 0.65)
-    
+
     def test_mixed_and_or_links(self):
         """Test node with both AND and OR links"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -404,18 +323,17 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # child2: 0.8, child3: 0.4
         self.assertEqual(result["children"][1]["calculatedProbability"], 0.8)
         self.assertEqual(result["children"][2]["calculatedProbability"], 0.4)
         # child1: first apply AND link: 0.5 * 0.8 = 0.4
         # then apply OR link: 1 - (1-0.4)*(1-0.4) = 1 - 0.6*0.6 = 1 - 0.36 = 0.64
         self.assertEqual(result["children"][0]["calculatedProbability"], 0.64)
-    
+
     def test_zero_probability_leaf(self):
         """Test that zero probability propagates correctly"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -442,14 +360,13 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
-        # AND gate with one zero child: 1.0 * (0.0 * 1.0) = 0.0
+        })
+        # AND gate with one zero child: 0.0 * 1.0 = 0.0
         self.assertEqual(result["calculatedProbability"], 0.0)
-    
+
     def test_nested_and_gates(self):
         """Test nested AND gates"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -486,8 +403,7 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # grandchild1: 0.5, grandchild2: 0.6
         self.assertEqual(result["children"][0]["children"][0]["calculatedProbability"], 0.5)
         self.assertEqual(result["children"][0]["children"][1]["calculatedProbability"], 0.6)
@@ -495,10 +411,10 @@ class TestProbabilityCalculation(unittest.TestCase):
         self.assertEqual(result["children"][0]["calculatedProbability"], 0.3)
         # root (AND gate): product(children) = 0.3
         self.assertEqual(result["calculatedProbability"], 0.3)
-    
+
     def test_nested_or_gates(self):
         """Test nested OR gates"""
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -535,8 +451,7 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # grandchild1: 0.5, grandchild2: 0.2
         self.assertEqual(result["children"][0]["children"][0]["calculatedProbability"], 0.5)
         self.assertEqual(result["children"][0]["children"][1]["calculatedProbability"], 0.2)
@@ -544,12 +459,12 @@ class TestProbabilityCalculation(unittest.TestCase):
         self.assertEqual(result["children"][0]["calculatedProbability"], 0.6)
         # root (OR gate): 1 - (1-0.6) = 1 - 0.4 = 0.6
         self.assertEqual(result["calculatedProbability"], 0.6)
-    
+
     def test_circular_reference_protection(self):
         """Test that circular references are handled (uses base probability)"""
         # This is a tricky case - we set up a potential circular reference
         # The algorithm should handle this with the visiting set
-        data = {
+        result = self.calc({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -572,20 +487,19 @@ class TestProbabilityCalculation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
         # Should complete without infinite loop
         # When circular reference detected, uses base probability
         self.assertIsNotNone(result["children"][0]["calculatedProbability"])
 
 
 class TestSampleDataValidation(unittest.TestCase):
-    """Validate calculations against the sample FTA data"""
-    
+    """Validate calculations against the sample FTA data (real FTACore)"""
+
     def setUp(self):
         """Set up test fixtures"""
-        self.calc = ProbabilityCalculator()
-    
+        self.core = FTACore()
+
     def test_sample_event_1_1_1(self):
         """Test Event1.1.1 from sampleFTA.json
         - Base probability: 0.5
@@ -593,7 +507,7 @@ class TestSampleDataValidation(unittest.TestCase):
         - Has AND link to root_0_2 (prob 0.8)
         - Expected: 0.5 * 0.8 (AND) = 0.4, then OR with 0.0 = 0.4
         """
-        data = {
+        self.core.set_data({
             "id": "root",
             "name": "Root",
             "type": "Event",
@@ -638,11 +552,45 @@ class TestSampleDataValidation(unittest.TestCase):
                 }
             ],
             "links": []
-        }
-        result = self.calc.recalculate_probabilities(data)
+        })
+        self.core.recalculate_probabilities()
+        node = self.core.find_node_by_id("root_0_0_0")
         # First AND link: 0.5 * 0.8 = 0.4
         # Then OR link: 1 - (1-0.4)*(1-0.0) = 1 - 0.6*1.0 = 0.4
-        self.assertEqual(result["children"][0]["calculatedProbability"], 0.4)
+        self.assertEqual(node["calculatedProbability"], 0.4)
+
+    def test_sample_file_matches_stored_results(self):
+        """Load the real sampleFTA.json and verify recalculated probabilities
+        match the calculatedProbability values stored in the file."""
+        sample_path = (Path(__file__).parent.parent
+                       / "data" / "examples" / "sampleFTA.json")
+        if not sample_path.exists():
+            self.skipTest(f"sample file not found: {sample_path}")
+
+        success, error = self.core.load_from_json(str(sample_path))
+        self.assertTrue(success, f"Failed to load sampleFTA.json: {error}")
+
+        # load_from_json() normalizes and recalculates probabilities; compare
+        # against the values stored in the file itself
+        import json
+        with open(sample_path, "r", encoding="utf-8") as f:
+            stored = json.load(f)["tree"]
+
+        def check(node, stored_node):
+            self.assertEqual(
+                node.get("calculatedProbability"),
+                stored_node.get("calculatedProbability"),
+                f"Mismatch at node {node.get('id')} ({node.get('name')})"
+            )
+            for child, stored_child in zip(node.get("children", []),
+                                           stored_node.get("children", [])):
+                check(child, stored_child)
+
+        check(self.core.get_data(), stored)
+
+        # Spot-check the documented expectation for Ev1.1.1 (root_0_0_0)
+        ev111 = self.core.find_node_by_id("root_0_0_0")
+        self.assertEqual(ev111["calculatedProbability"], 0.4)
 
 
 def run_tests():
@@ -650,15 +598,15 @@ def run_tests():
     # Create test suite
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
-    
+
     # Add all test cases
     suite.addTests(loader.loadTestsFromTestCase(TestProbabilityCalculation))
     suite.addTests(loader.loadTestsFromTestCase(TestSampleDataValidation))
-    
+
     # Run tests with verbose output
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
-    
+
     # Print summary
     print("\n" + "="*70)
     print("PROBABILITY CALCULATION VALIDATION SUMMARY")
@@ -668,19 +616,20 @@ def run_tests():
     print(f"Failures: {len(result.failures)}")
     print(f"Errors: {len(result.errors)}")
     print("="*70)
-    
+
     if result.wasSuccessful():
         print("\n✓ All probability calculation tests passed!")
-        print("\nValidated behaviors:")
+        print("\nValidated behaviors (against real src/FTA_Editor_core.py):")
         print("  • AND gate: calculates product of child probabilities")
         print("  • OR gate: uses union formula 1 - product(1 - p for each child)")
         print("  • AND links: multiply current probability with linked probabilities")
         print("  • OR links: apply union formula with linked probabilities")
         print("  • Mixed links: AND links applied first, then OR links")
         print("  • Circular references: handled via visiting set (uses base probability)")
+        print("  • sampleFTA.json: recalculated values match stored results")
     else:
         print("\n✗ Some tests failed. See details above.")
-    
+
     return result.wasSuccessful()
 
 

@@ -31,8 +31,25 @@ GATE_LABEL = {
 def sanitize_id(s):
     return re.sub(r'[^0-9A-Za-z_]', '_', str(s))
 
+def escape_html(s):
+    """Escape text for use inside DOT HTML-like labels"""
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def escape_dot_title(s):
+    """Escape text for use inside a quoted DOT label string"""
+    return str(s).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+def _fmt_prob(v):
+    """Format a probability value; tolerate non-numeric input"""
+    if v is None:
+        return "未计算"
+    try:
+        return f"{float(v):.1E}"
+    except (TypeError, ValueError):
+        return str(v)
+
 def node_label(node, show_probability=True, show_inline_gate=True):
-    name = node.get("name", node.get("id", ""))
+    name = escape_html(node.get("name", node.get("id", "")))
     gate = node.get("logicGate", "")
     cp = node.get("calculatedProbability")
 
@@ -42,10 +59,8 @@ def node_label(node, show_probability=True, show_inline_gate=True):
         parts.append("门: " + GATE_LABEL.get(str(gate), gate))
     if show_probability:
         p = node.get("probability")
-        p_str = f"{p:.1E}" if p is not None else "未计算"
-        cp_str = f"{cp:.1E}" if cp is not None else "未计算"
-        parts.append(f"概率:{p_str}")
-        parts.append(f"计算概率:{cp_str}")
+        parts.append(f"概率:{_fmt_prob(p)}")
+        parts.append(f"计算概率:{_fmt_prob(cp)}")
     meta = " | ".join(parts)
 
     # Color coding based on calculated probability
@@ -359,7 +374,7 @@ def main():
     # Add title and date to DOT
     dot_lines = dot_text.split('\n')
     dot_lines.insert(1, f'  labelloc="t";')
-    dot_lines.insert(2, f'  label="{title}\\n日期: {date}";')
+    dot_lines.insert(2, f'  label="{escape_dot_title(title)}\\n日期: {date}";')
     dot_lines.insert(3, f'  fontsize=14;')
     dot_lines.insert(4, f'  fontname="{cjk_font()}";')
     dot_text = '\n'.join(dot_lines)

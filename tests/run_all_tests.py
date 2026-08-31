@@ -9,14 +9,7 @@ from pathlib import Path
 def run_tests():
     """Run all test files"""
     test_dir = Path(__file__).parent
-    test_files = [
-        "test_core_module.py",
-        "test_probability_calculation.py",
-        "test_eta_mode.py",
-        "test_excel_export.py",
-        "test_validator.py",
-        "test_update_flow_mock.py",
-    ]
+    test_files = sorted(p.name for p in test_dir.glob("test_*.py"))
     
     print("=" * 70)
     print("FTA/ETA EDITOR - TEST SUITE")

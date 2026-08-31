@@ -12,6 +12,7 @@ This module handles AI agent functionality for the FTA Editor:
 import os
 import json
 import re
+import base64
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Callable
 from ai_providers import AIProviderFactory
@@ -23,32 +24,58 @@ class AICredentialManager:
     # Store credentials in user's home directory, not in repository
     CREDENTIALS_DIR = Path.home() / ".fta_editor"
     CREDENTIALS_FILE = CREDENTIALS_DIR / "ai_credentials.json"
-    
+
+    # 环境变量名：设置后优先于配置文件中的 api_key
+    ENV_API_KEY = "FTA_AI_API_KEY"
+
     def __init__(self):
         """Initialize the credential manager"""
         self._ensure_credentials_dir()
-    
+
     def _ensure_credentials_dir(self):
         """Ensure the credentials directory exists"""
         self.CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
-    
+
+    @staticmethod
+    def _obfuscate_key(api_key: str) -> str:
+        """Base64-obfuscate the API key.
+
+        注意：base64 仅为防止误看/明文扫视的混淆手段，并非加密；
+        有高安全需求的用户请改用环境变量 FTA_AI_API_KEY。
+        """
+        return base64.b64encode(api_key.encode("utf-8")).decode("ascii")
+
+    @staticmethod
+    def _deobfuscate_key(stored: str) -> str:
+        """Decode a base64-obfuscated API key; return input unchanged on failure."""
+        try:
+            return base64.b64decode(stored.encode("ascii")).decode("utf-8")
+        except Exception:
+            return stored
+
     def save_credentials(self, api_key: str, api_endpoint: str = "https://api.openai.com/v1",
                         model: str = "gpt-4o", provider: str = "OpenAI") -> Tuple[bool, Optional[str]]:
         """
         Save API credentials to local storage.
-        
+
+        The api_key is stored base64-obfuscated with an "api_key_enc": true
+        marker (obfuscation only, NOT encryption; use the FTA_AI_API_KEY
+        environment variable for stronger security).
+
         Args:
             api_key: The API key for the provider
             api_endpoint: The API endpoint URL
             model: The model to use
             provider: The AI provider name (OpenAI, Anthropic Claude, Google Gemini)
-            
+
         Returns:
             Tuple of (success, error_message)
         """
         try:
             credentials = {
-                "api_key": api_key,
+                # base64 混淆存储，仅防误看，非加密；高安全需求请用环境变量 FTA_AI_API_KEY
+                "api_key": self._obfuscate_key(api_key),
+                "api_key_enc": True,  # 版本标记：区分旧的明文配置
                 "api_endpoint": api_endpoint,
                 "model": model,
                 "provider": provider
@@ -58,23 +85,43 @@ class AICredentialManager:
             return True, None
         except Exception as e:
             return False, f"Failed to save credentials: {e}"
-    
+
     def load_credentials(self) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
         """
         Load API credentials from local storage.
-        
+
+        读取优先级：环境变量 FTA_AI_API_KEY > 配置文件。
+        配置文件兼容两种格式：
+        - 新格式：带 "api_key_enc": true 标记，api_key 为 base64 混淆值，读取时解码；
+        - 旧格式：无标记，api_key 按明文读取（下次保存时自动转为混淆存储）。
+
         Returns:
             Tuple of (credentials_dict or None, error_message or None)
         """
-        if not self.CREDENTIALS_FILE.exists():
+        credentials = None
+
+        if self.CREDENTIALS_FILE.exists():
+            try:
+                with open(self.CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
+                    credentials = json.load(f)
+            except Exception as e:
+                return None, f"Failed to load credentials: {e}"
+
+            # 兼容旧的明文配置：无 api_key_enc 标记则按明文读取
+            if credentials.get("api_key_enc"):
+                credentials["api_key"] = self._deobfuscate_key(
+                    credentials.get("api_key", ""))
+
+        # 环境变量优先于配置文件
+        env_key = os.environ.get(self.ENV_API_KEY, "").strip()
+        if env_key:
+            if credentials is None:
+                credentials = {}
+            credentials["api_key"] = env_key
+
+        if credentials is None:
             return None, "Credentials not configured. Please set up AI credentials first."
-        
-        try:
-            with open(self.CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
-                credentials = json.load(f)
-            return credentials, None
-        except Exception as e:
-            return None, f"Failed to load credentials: {e}"
+        return credentials, None
     
     def delete_credentials(self) -> Tuple[bool, Optional[str]]:
         """
@@ -91,8 +138,9 @@ class AICredentialManager:
             return False, f"Failed to delete credentials: {e}"
     
     def has_credentials(self) -> bool:
-        """Check if credentials are configured"""
-        return self.CREDENTIALS_FILE.exists()
+        """Check if credentials are configured (config file or env variable)"""
+        return (self.CREDENTIALS_FILE.exists()
+                or bool(os.environ.get(self.ENV_API_KEY, "").strip()))
 
 
 class FTAStructureAnalyzer:
@@ -344,6 +392,7 @@ CRITICAL RULES FOR YOUR RESPONSES:
         self.pending_changes: List[AIProposedChange] = []
         self.on_message_callback = on_message_callback
         self.provider = None
+        self._client = None
     
     def _get_provider(self):
         """Get the AI provider based on credentials"""
@@ -730,7 +779,8 @@ Example of a valid node for DATA field:
                     "links": []
                 }
                 
-                core.add_node_to_data(change.target_id, new_node)
+                if not core.add_node_to_data(change.target_id, new_node):
+                    return False, f"Failed to add node: parent '{change.target_id}' not found in data"
                 return True, f"✓ Added node '{new_node['name']}' to parent"
             
             elif change.change_type == 'edit':
@@ -829,8 +879,7 @@ Example of a valid node for DATA field:
         """Check if moving would create circular reference"""
         if potential_parent_id == node_id:
             return True
-        return core._find_node_by_id_recursive(core.fta_data, node_id) and \
-               self._is_descendant_of(core, node_id, potential_parent_id)
+        return self._is_descendant_of(core, potential_parent_id, node_id)
     
     def _is_descendant_of(self, core: 'FTACore', node_id: str, 
                          potential_ancestor_id: str) -> bool:

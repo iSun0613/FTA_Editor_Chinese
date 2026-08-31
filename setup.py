@@ -2,7 +2,7 @@
 FTA/ETA Editor Setup
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup
 import os
 
 # Read README for long description
@@ -22,7 +22,17 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Gertrud-Violett/FTA_editor",
-    packages=find_packages(where="src"),
+    # src/ contains flat top-level modules (no __init__.py packages), so
+    # find_packages(where="src") finds nothing and the distribution would be
+    # empty. List the modules explicitly via py_modules instead.
+    py_modules=[
+        "FTA_Editor_UI",
+        "FTA_Editor_core",
+        "AI_agent_handler",
+        "ai_providers",
+        "json_viewer",
+        "mermaid_exporter",
+    ],
     package_dir={"": "src"},
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -30,12 +40,12 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Scientific/Engineering",
         "Topic :: Software Development :: Libraries :: Python Modules",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: BSD License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.14",
+        "Programming Language :: Python :: 3.10",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.14",
+    python_requires=">=3.10",
     install_requires=requirements,
     extras_require={
         "dev": [
