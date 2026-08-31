@@ -379,6 +379,29 @@ class OllamaProvider(OpenAICompatibleProvider):
     default_models = ["qwen3:8b", "llama3.3:70b", "qwen2.5"]
 
 
+class MoMAProvider(OpenAICompatibleProvider):
+    """移动云 MoMA 模型服务平台（大模型超市，OpenAI 兼容接口）
+
+    按《API 调用接口总览》（更新时间 2026/08/28）：
+    - GLM / Kimi / MiniMax 系列走 MoMA 统一网关 moma.cmecloud.cn/v1（本类默认端点）
+    - DeepSeek / Qwen 等模型走真泽资源池域名，需在端点框改为
+      https://zhenze-huhehaote.cmecloud.cn/v1
+    模型 ID 与 MoMA 控制台"模型广场"一致，如 ZHIPU/GLM-5.3、kimi/kimi-k3、
+    minimax/minimax-m3。用户只需填 API 密钥；模型列表可点界面 ↻ 按钮按密钥
+    拉取，也可直接手填。控制台入口：https://ecloud.10086.cn/portal/product/MaaS
+    """
+    provider_display_name = "移动云 MoMA"
+    default_endpoint = "https://moma.cmecloud.cn/v1"
+    default_models = [
+        "ZHIPU/GLM-5.3",
+        "ZHIPU/GLM-5.2",
+        "ZHIPU/GLM-5.1",
+        "kimi/kimi-k3",
+        "kimi/kimi-k2.7-code",
+        "minimax/minimax-m3",
+    ]
+
+
 class AIProviderFactory:
     """Factory for creating AI provider instances"""
     
@@ -391,6 +414,7 @@ class AIProviderFactory:
         "glm": ZhipuProvider(),       # 智谱 GLM
         "moonshot": MoonshotProvider(),
         "kimi": MoonshotProvider(),   # 月之暗面 Kimi
+        "moma": MoMAProvider(),       # 中国移动云 MoMA 模型服务平台
         "ollama": OllamaProvider(),   # 本地部署
         # 国际服务商
         "openai": OpenAIProvider(),
@@ -420,6 +444,12 @@ class AIProviderFactory:
         "kimi 月之暗面": "moonshot",
         "kimi": "moonshot",
         "moonshot": "moonshot",
+        "移动云 moma": "moma",
+        "移动云": "moma",
+        "moma": "moma",
+        "ecloud": "moma",
+        "九天": "moma",
+        "jiutian": "moma",
         "ollama 本地": "ollama",
         "ollama": "ollama",
     }

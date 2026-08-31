@@ -498,7 +498,7 @@ class FTAEditorUI:
         provider_combo.set(existing_creds.get("provider", provider_names[0]) if existing_creds else provider_names[0])
         provider_hint = tk.Label(
             dialog,
-            text="选择服务商后，下方模型列表会自动更新。国内/本地服务商：DeepSeek / 通义千问 / 智谱清言 / Kimi / Ollama 本地",
+            text="选择服务商后，下方模型列表会自动更新。国内/本地/聚合服务商：DeepSeek / 通义千问 / 智谱清言 / Kimi / 移动云 MoMA / Ollama 本地",
             font=(UI_FONT, 8), fg=MAC_TEXT_DIM, bg=MAC_PANEL, justify="left")
         provider_hint.pack(anchor="w", padx=24)
         

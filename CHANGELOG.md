@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 节点新增 `voteThreshold` 字段：接受整数、数字字符串或 "k/n" 形式，缺省为多数表决（n//2+1），越界自动回退缺省；节点编辑对话框可直接选择 5 种门类型并设置表决阈值
 - 新增 `tests/run_all_tests.py` 一键运行全部 7 个测试套件；概率计算测试扩展至 18 个用例（新增 XOR / NOT / VOTER 用例）
 - 新增 `setup.py` 与 `MANIFEST.in`，支持打包安装
+- 新增 **移动云 MoMA** 服务商支持（src/ai_providers.py）：接入中国移动"大模型超市"聚合平台（OpenAI 兼容接口，按官方《API 调用接口总览》），默认端点 `https://moma.cmecloud.cn/v1`，内置 `ZHIPU/GLM-5.3` / `kimi/kimi-k3` / `minimax/minimax-m3` 等真实模型 ID；DeepSeek / 通义千问等改端点为真泽资源池即可调用；用户只需填 API 密钥，模型名支持界面刷新拉取或手动填写
 
 ### Fixed
 - **概率抹零问题**：FTA 门计算、链接概率、ETA 共 5 处 `round(…, 6)` 全部去除，1e-6 量级的小概率不再被算成 0，全程保留完整浮点精度

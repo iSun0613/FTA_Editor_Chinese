@@ -1,6 +1,6 @@
 # FTA/ETA Editor 中文版
 
-FTA/ETA 事故树编辑器（中文版）：一款功能完整的故障树分析（FTA）与事件树分析（ETA）桌面软件，支持概率计算、可视化树编辑、AI 分析助手与多种格式导出。本版内置 **DeepSeek、通义千问、智谱清言、Kimi** 等国内大模型与 **Ollama 本地**模型，开箱即可直连使用 AI 分析助手。
+FTA/ETA 事故树编辑器（中文版）：一款功能完整的故障树分析（FTA）与事件树分析（ETA）桌面软件，支持概率计算、可视化树编辑、AI 分析助手与多种格式导出。本版内置 **DeepSeek、通义千问、智谱清言、Kimi、移动云 MoMA** 等国内大模型与 **Ollama 本地**模型，开箱即可直连使用 AI 分析助手。
 
 本仓库源于 [Gertrud-Violett/FTA_Editor](https://github.com/Gertrud-Violett/FTA_Editor)，在保留原版完整功能的基础上，新增 Windows / macOS / Linux 一键启动脚本与面向国内用户的 AI 服务商支持，界面与文档均为简体中文，方便中文用户直接下载使用。
 
@@ -21,7 +21,7 @@ FTA/ETA 事故树编辑器（中文版）：一款功能完整的故障树分析
 
 1. **界面与文档全部为简体中文**：界面、菜单、按钮、提示与 AI 助手对话文案，以及 README、快速入门、用户手册、AI 配置、API 参考等全部文档均提供简体中文版本，方便中文用户直接上手。
 2. **多平台一键启动脚本**：新增 Windows `启动FTA编辑器.bat` 与 macOS / Linux `启动FTA编辑器.sh`，安装依赖后即可一键运行，省去手动敲命令。
-3. **扩展国内 AI 服务商支持**：在原有 OpenAI / Claude / Gemini 之外，新增 **DeepSeek、通义千问、智谱清言、Kimi** 与 **Ollama 本地** 5 家国内 / 本地服务商，均走 OpenAI 兼容接口、复用现有 `openai` SDK，无需新增依赖，开箱即用。
+3. **扩展国内 AI 服务商支持**：在原有 OpenAI / Claude / Gemini 之外，新增 **DeepSeek、通义千问、智谱清言、Kimi、移动云 MoMA** 与 **Ollama 本地** 6 家国内 / 本地 / 聚合服务商，均走 OpenAI 兼容接口、复用现有 `openai` SDK，无需新增依赖，开箱即用。
 4. **面向国内用户做了适配**：端点（Endpoint）与默认模型均已内置并更新至各厂商最新版，通常无需手动填写；Ollama 本地可免密钥运行。
 5. **精简服务商列表**：移除对国内用户实用性较低的 Microsoft / Azure / GitHub Copilot 支持，让设置更清晰聚焦。
 6. **故障树渲染优化**：图形默认**竖向**布局（根事件在上、子事件向下展开，符合常见事故树图示习惯）；渲染时按系统**自动适配可用中文字体**（Windows 微软雅黑 / macOS 苹方 / Linux 文泉驿），不再因缺字体显示为方框（豆腐块）；渲染标签（概率、计算概率、日期、与门 / 或门等）全部为中文；并增加 **Graphviz 自动定位**与友好报错提示。
@@ -87,7 +87,7 @@ python src/FTA_Editor_UI.py
 
 ## AI 助手配置（可选）
 
-内置 AI 助手已为国内用户优先适配 **DeepSeek、通义千问、智谱清言、Kimi** 与 **Ollama 本地**（免密钥）；端点与默认模型均已内置，通常无需改动。
+内置 AI 助手已为国内用户优先适配 **DeepSeek、通义千问、智谱清言、Kimi、移动云 MoMA** 与 **Ollama 本地**（免密钥）；端点与默认模型均已内置，通常无需改动。
 
 | 服务商 | 推荐模型 | 开通地址 |
 |--------|---------|---------|
@@ -95,11 +95,12 @@ python src/FTA_Editor_UI.py
 | **通义千问** | `qwen3.8-max` / `qwen3.8-flash` / `qwen3.7-plus` | https://dashscope.console.aliyun.com |
 | **智谱清言** | `glm-5.3` / `glm-5.3-flash` / `glm-4.7-flash` | https://open.bigmodel.cn |
 | **Kimi** | `kimi-k3` / `kimi-k2.7-code` | https://platform.moonshot.cn |
+| **移动云 MoMA** | `ZHIPU/GLM-5.3` / `kimi/kimi-k3` / `minimax/minimax-m3` 等（一个密钥通吃 GLM / Kimi / MiniMax 等 300+ 模型） | https://ecloud.10086.cn/portal/product/MaaS |
 | **Ollama 本地** | `qwen3:8b` / `llama3.3:70b` / `qwen2.5` | 本机 `ollama pull`，免密钥 |
 
 国际服务商（OpenAI / Claude / Gemini）同样可在设置中选用。
 
-> **注意**：AI 设置窗口中，模型列表跟随最上方"AI 服务商"下拉框联动。服务商已按国内优先排序，默认停在第一个（DeepSeek）；切换到 DeepSeek / 通义千问 / 智谱清言 / Kimi / Ollama 本地，下方的模型下拉框即会自动填入上表对应的默认模型；若已填写该服务商 API 密钥，则实时拉取该账号可用的全部模型。
+> **注意**：AI 设置窗口中，模型列表跟随最上方"AI 服务商"下拉框联动。服务商已按国内优先排序，默认停在第一个（DeepSeek）；切换到 DeepSeek / 通义千问 / 智谱清言 / Kimi / 移动云 MoMA / Ollama 本地，下方的模型下拉框即会自动填入上表对应的默认模型；若已填写该服务商 API 密钥，则实时拉取该账号可用的全部模型。移动云 MoMA 为中国移动"大模型超市"聚合平台，默认端点 `https://moma.cmecloud.cn/v1`，GLM / Kimi / MiniMax 系列开箱即用；DeepSeek / 通义千问等走真泽资源池，需把端点改为 `https://zhenze-huhehaote.cmecloud.cn/v1`。模型 ID 与 MoMA 控制台"模型广场"一致（如 `ZHIPU/GLM-5.3`、`kimi/kimi-k3`），具体以其控制台为准（填入密钥后点刷新可拉取，也可直接手填模型名）。
 
 **配置**：打开 FTA Editor → AI 设置（⚙）→ 选择服务商、填入 API 密钥（本地模型可留空）→ 测试并保存。凭据仅保存在本地 `~/.fta_editor/ai_credentials.json`（混淆存储）。也可通过环境变量 `FTA_AI_API_KEY` 提供密钥，优先级高于配置文件，适合不便落盘的场景。
 
